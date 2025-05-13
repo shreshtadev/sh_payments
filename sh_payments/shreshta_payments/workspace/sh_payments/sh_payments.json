@@ -1,0 +1,69 @@
+{
+ "charts": [],
+ "content": "[{\"id\":\"xXvrzNNkgu\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\">Sh Payments</span>\",\"col\":12}},{\"id\":\"nlq8-ww3ky\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Customers - Vouchers\",\"col\":3}},{\"id\":\"SeVGTA5mll\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Customers - Receipt\",\"col\":3}},{\"id\":\"7k5UJ-E8sF\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Vouchers\",\"col\":3}},{\"id\":\"Wjf3x1DORx\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Receipts\",\"col\":3}},{\"id\":\"hrwOj4DubK\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Day Book\",\"col\":3}}]",
+ "creation": "2025-05-11 21:52:32.887766",
+ "custom_blocks": [],
+ "docstatus": 0,
+ "doctype": "Workspace",
+ "for_user": "",
+ "hide_custom": 0,
+ "icon": "money-coins-1",
+ "idx": 4,
+ "indicator_color": "cyan",
+ "is_hidden": 0,
+ "label": "Sh Payments",
+ "links": [],
+ "modified": "2025-05-13 15:36:58.561904",
+ "modified_by": "Administrator",
+ "module": "Shreshta Payments",
+ "name": "Sh Payments",
+ "number_cards": [],
+ "owner": "Administrator",
+ "parent_page": "",
+ "public": 1,
+ "quick_lists": [],
+ "roles": [],
+ "sequence_id": 39.0,
+ "shortcuts": [
+  {
+   "color": "Grey",
+   "doc_view": "List",
+   "label": "Day Book",
+   "link_to": "DayBookRep",
+   "type": "Report"
+  },
+  {
+   "color": "Yellow",
+   "doc_view": "List",
+   "label": "Customers - Vouchers",
+   "link_to": "ShCustomer",
+   "stats_filter": "[[\"ShCustomer\",\"customer_type\",\"=\",\"Voucher\",false]]",
+   "type": "DocType"
+  },
+  {
+   "color": "Yellow",
+   "doc_view": "List",
+   "label": "Customers - Receipt",
+   "link_to": "ShCustomer",
+   "stats_filter": "[[\"ShCustomer\",\"customer_type\",\"=\",\"Receipt\",false]]",
+   "type": "DocType"
+  },
+  {
+   "color": "Green",
+   "doc_view": "List",
+   "label": "Vouchers",
+   "link_to": "ShPayment",
+   "stats_filter": "[[\"ShPayment\",\"payment_type\",\"=\",\"Voucher\",false]]",
+   "type": "DocType"
+  },
+  {
+   "color": "Cyan",
+   "doc_view": "List",
+   "label": "Receipts",
+   "link_to": "ShPayment",
+   "stats_filter": "[[\"ShPayment\",\"payment_type\",\"=\",\"Receipt\",false]]",
+   "type": "DocType"
+  }
+ ],
+ "title": "Sh Payments"
+}

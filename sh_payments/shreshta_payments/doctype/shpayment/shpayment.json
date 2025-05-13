@@ -1,0 +1,144 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "format:{payment_type}-{MM}-{YYYY}-{sl_no}-{#####}",
+ "creation": "2025-05-08 04:06:07.142297",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "payment_status",
+  "section_break_qoxt",
+  "sl_no",
+  "payment_ref",
+  "payment_date",
+  "paid_on",
+  "column_break_cxpr",
+  "from_to",
+  "total_amount",
+  "payment_type",
+  "narration"
+ ],
+ "fields": [
+  {
+   "fieldname": "section_break_qoxt",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "payment_ref",
+   "fieldtype": "Data",
+   "label": "Payment Ref",
+   "length": 144
+  },
+  {
+   "fieldname": "column_break_cxpr",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "sl_no",
+   "fieldtype": "Int",
+   "label": "Sl No",
+   "non_negative": 1
+  },
+  {
+   "fieldname": "payment_date",
+   "fieldtype": "Date",
+   "label": "Payment Date"
+  },
+  {
+   "fieldname": "narration",
+   "fieldtype": "Data",
+   "hidden": 1,
+   "label": "Narration",
+   "length": 255,
+   "print_hide": 1,
+   "report_hide": 1
+  },
+  {
+   "default": "Cash",
+   "fieldname": "paid_on",
+   "fieldtype": "Select",
+   "label": "Paid On",
+   "options": "Cash\nCheque\nDD\nCard\nUPI\nNEFT\nRTGS"
+  },
+  {
+   "fieldname": "total_amount",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Total Amount",
+   "non_negative": 1,
+   "precision": "2",
+   "reqd": 1
+  },
+  {
+   "default": "Receipt",
+   "fieldname": "payment_type",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Payment Type",
+   "options": "Receipt\nVoucher",
+   "reqd": 1
+  },
+  {
+   "default": "Pending",
+   "fieldname": "payment_status",
+   "fieldtype": "Select",
+   "label": "Payment Status",
+   "options": "Pending\nCompleted\nCancelled"
+  },
+  {
+   "fieldname": "from_to",
+   "fieldtype": "Link",
+   "label": "From/To",
+   "options": "ShCustomer"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2025-05-12 11:27:36.672102",
+ "modified_by": "Administrator",
+ "module": "Shreshta Payments",
+ "name": "ShPayment",
+ "naming_rule": "Expression",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Sh Payments Admin",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Sh Payments User",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}
