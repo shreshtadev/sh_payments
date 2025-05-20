@@ -1,0 +1,100 @@
+{
+ "actions": [],
+ "autoname": "format:SHBI-{####}",
+ "creation": "2025-05-19 16:18:54.780130",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "sl_no",
+  "section_break_mltd",
+  "hsn_code",
+  "quantity",
+  "cgst",
+  "column_break_mlcl",
+  "particular",
+  "price",
+  "sgst",
+  "section_break_eabg",
+  "amount"
+ ],
+ "fields": [
+  {
+   "fieldname": "sl_no",
+   "fieldtype": "Int",
+   "label": "Sl No",
+   "non_negative": 1
+  },
+  {
+   "fieldname": "quantity",
+   "fieldtype": "Int",
+   "label": "Quantity",
+   "non_negative": 1
+  },
+  {
+   "fieldname": "amount",
+   "fieldtype": "Currency",
+   "label": "Amount",
+   "non_negative": 1,
+   "precision": "2",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_mlcl",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "particular",
+   "fieldtype": "Data",
+   "label": "Particular",
+   "length": 144
+  },
+  {
+   "fieldname": "price",
+   "fieldtype": "Currency",
+   "label": "Price",
+   "non_negative": 1,
+   "precision": "2"
+  },
+  {
+   "fieldname": "section_break_mltd",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "hsn_code",
+   "fieldtype": "Data",
+   "label": "HSNCode",
+   "length": 10
+  },
+  {
+   "fieldname": "cgst",
+   "fieldtype": "Percent",
+   "label": "CGST",
+   "precision": "0"
+  },
+  {
+   "fieldname": "sgst",
+   "fieldtype": "Percent",
+   "label": "SGST",
+   "precision": "0"
+  },
+  {
+   "fieldname": "section_break_eabg",
+   "fieldtype": "Section Break"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2025-05-19 16:34:28.506001",
+ "modified_by": "Administrator",
+ "module": "Shreshta Payments",
+ "name": "ShBill",
+ "naming_rule": "Expression",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

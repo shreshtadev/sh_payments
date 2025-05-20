@@ -31,7 +31,7 @@
    "fieldname": "customer_type",
    "fieldtype": "Select",
    "label": "Customer Type",
-   "options": "Receipt\nVoucher\nOther"
+   "options": "Receipt\nVoucher\nBill\nOther"
   },
   {
    "fieldname": "column_break_cegn",
@@ -83,7 +83,7 @@
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-05-13 16:26:27.063648",
+ "modified": "2025-05-19 15:46:38.031167",
  "modified_by": "Administrator",
  "module": "Shreshta Payments",
  "name": "ShCustomer",

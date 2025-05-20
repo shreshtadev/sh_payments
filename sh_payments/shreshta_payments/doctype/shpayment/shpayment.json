@@ -6,17 +6,23 @@
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
-  "payment_status",
+  "customer_details",
+  "from_to",
+  "column_break_wtmr",
+  "company_info",
+  "payment_details",
   "section_break_qoxt",
   "sl_no",
   "payment_ref",
   "payment_date",
   "paid_on",
   "column_break_cxpr",
-  "from_to",
+  "payment_status",
   "total_amount",
   "payment_type",
-  "narration"
+  "narration",
+  "bill_details",
+  "table_jmgk"
  ],
  "fields": [
   {
@@ -75,7 +81,7 @@
    "fieldtype": "Select",
    "in_list_view": 1,
    "label": "Payment Type",
-   "options": "Receipt\nVoucher",
+   "options": "Receipt\nVoucher\nBill",
    "reqd": 1
   },
   {
@@ -90,12 +96,42 @@
    "fieldtype": "Link",
    "label": "From/To",
    "options": "ShCustomer"
+  },
+  {
+   "fieldname": "column_break_wtmr",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "company_info",
+   "fieldtype": "Link",
+   "label": "Company Info",
+   "options": "ShCompany"
+  },
+  {
+   "fieldname": "bill_details",
+   "fieldtype": "Tab Break",
+   "label": "Bill Details"
+  },
+  {
+   "fieldname": "table_jmgk",
+   "fieldtype": "Table",
+   "options": "ShBill"
+  },
+  {
+   "fieldname": "customer_details",
+   "fieldtype": "Tab Break",
+   "label": "Customer Details"
+  },
+  {
+   "fieldname": "payment_details",
+   "fieldtype": "Tab Break",
+   "label": "Payment Details"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-05-12 11:27:36.672102",
+ "modified": "2025-05-19 16:40:16.062503",
  "modified_by": "Administrator",
  "module": "Shreshta Payments",
  "name": "ShPayment",
