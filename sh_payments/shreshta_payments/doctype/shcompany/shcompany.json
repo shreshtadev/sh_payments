@@ -150,7 +150,7 @@
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-05-19 16:55:09.127745",
+ "modified": "2025-05-21 11:12:51.266782",
  "modified_by": "Administrator",
  "module": "Shreshta Payments",
  "name": "ShCompany",
@@ -177,7 +177,10 @@
    "write": 1
   }
  ],
+ "row_format": "Dynamic",
+ "show_title_field_in_link": 1,
  "sort_field": "modified",
  "sort_order": "DESC",
- "states": []
+ "states": [],
+ "title_field": "c_name"
 }
