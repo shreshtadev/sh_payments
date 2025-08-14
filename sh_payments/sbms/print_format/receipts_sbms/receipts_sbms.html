@@ -1,9 +1,15 @@
 {%- from "templates/print_formats/standard_macros.html" import add_header -%}
-<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/css/bootstrap.min.css" rel="stylesheet"
-    integrity="sha384-LN+7fdVzj6u52u30Kp6M/trliBMCMKTyK833zpbD+pXdCLuTusPj697FH4R/5mcr" crossorigin="anonymous">
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/js/bootstrap.bundle.min.js"
+<link
+    href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/css/bootstrap.min.css"
+    rel="stylesheet"
+    integrity="sha384-LN+7fdVzj6u52u30Kp6M/trliBMCMKTyK833zpbD+pXdCLuTusPj697FH4R/5mcr"
+    crossorigin="anonymous"
+/>
+<script
+    src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/js/bootstrap.bundle.min.js"
     integrity="sha384-ndDqU0Gzau9qJ1lfW4pNLlhNTkCfHzAVBReH9diLvGRem5+R9g2FzA8ZGN954O5Q"
-    crossorigin="anonymous"></script>
+    crossorigin="anonymous"
+></script>
 <style>
     @media print {
         .container {
@@ -61,16 +67,12 @@
 <div class="print-format">
     <div class="card border-dark bg-warning">
         <div class="card-header text-center print-heading position-relative">
-            <div style="font-size: 1.2rem;">ॐ</div>
+            <div style="font-size: 1.2rem">ॐ</div>
             <h5 class="print-heading-label">ಶಿವಮೊಗ್ಗ ಜಿಲ್ಲಾ ಬ್ರಾಹ್ಮಣ ಮಹಾಸಭಾ</h5>
-            <p>ಕಛೇರಿ: ಬ್ರಾಹ್ಮಣ ವಿದ್ಯಾರ್ಥಿ ನಿಲಯ, ಬಿ, ಹೆಚ್. ರಸ್ತೆ, ಶಿವಮೊಗ್ಗ-577201
-                <span>
-                    Donations made to <strong>Jilla Brahmana Mahasabha / Surabhi Goshale</strong>
-                    is exempted U/S 80G of Income Tax ACt 1961 vide certificate No. AAAAJ7429FF20221, w.e.f 24.06.2022.
-                    Donations of Rs: 2000/- and above in cash is not exempted U/S 80G of Income Tax Act 1961
-                </span>
+            <p>
+                ಕಛೇರಿ: ಬ್ರಾಹ್ಮಣ ವಿದ್ಯಾರ್ಥಿ ನಿಲಯ, ಬಿ, ಹೆಚ್. ರಸ್ತೆ,
+                ಶಿವಮೊಗ್ಗ-577201
             </p>
-            <div class="rashid-box">ದೂರವಾಣಿ ಸಂಖ್ಯೆ: ೦೮೧೮೨ ೨೨೨೬೯೯</div>
         </div>
         <div class="card-body px-4 py-3">
             <div class="row mb-2">
@@ -80,43 +82,74 @@
                 </div>
                 <div class="col-6 text-end">
                     <strong>ದಿನಾಂಕ:</strong>
-                    <span class="ms-2">{{ frappe.utils.format_date(doc.creation) }}</span>
+                    <span class="ms-2"
+                        >{{ frappe.utils.format_date(doc.creation) }}</span
+                    >
                 </div>
             </div>
-            <div class="border border-dark rounded p-3 mb-3" style="background: #fffbe7;">
+            <div
+                class="border border-dark rounded p-3 mb-3"
+                style="background: #fffbe7"
+            >
                 <div class="row mb-2">
                     <div class="col-12">
                         <strong>ಶ್ರೀಮತಿ/ಶ್ರೀ</strong>
                         {{ doc.get("party_name") or doc.get("party") or "" }}
                         <strong>ಇವರಿಂದ</strong>
-                        {{ doc.get("remarks") or doc.get("remarks_html") or "" }}
+                        {{ doc.get("remarks") or doc.get("remarks_html") or ""
+                        }}
                         <strong>ಬಾಬ್ತು</strong>
                         {{ doc.get("base_in_words") }}
                         <strong>ರೂ.ಗಣನ್ನು</strong>
                         <strong>{{doc.get('mode_of_payment') or ''}}</strong>
                         <span>
-                            {{doc.get('reference_no') or ''}} <strong>ದಿನಾಂಕ.</strong>
-                            {{ doc.get('reference_date') and frappe.utils.formatdate(doc.get('reference_date')) or '' }}
+                            {{doc.get('reference_no') or ''}}
+                            <strong>ದಿನಾಂಕ.</strong>
+                            {{ doc.get('reference_date') and
+                            frappe.utils.formatdate(doc.get('reference_date'))
+                            or '' }}
                             <span>
                                 <strong>ಬ್ಯಾಂಕ್</strong>
                                 {{ doc.get("party_bank_account") or "-" }}
                             </span>
                         </span>
-                        <strong>ಮೂಲಕ ಕೃತಜ್ಞಾತಪೂರ್ವಕವಾಗಿ ನಿಧಿಗೆ ಸ್ವೀಕರಿಸಲಗಿದೆ</strong>
+                        <strong
+                            >ಮೂಲಕ ಕೃತಜ್ಞಾತಪೂರ್ವಕವಾಗಿ ನಿಧಿಗೆ
+                            ಸ್ವೀಕರಿಸಲಗಿದೆ</strong
+                        >
                     </div>
                 </div>
             </div>
             <div class="row">
                 <div class="d-flex">
-                    <div class="border border-danger rounded p-2 text-center" style="font-size:1.5rem;">
+                    <div
+                        class="border border-danger rounded p-2 text-center"
+                        style="font-size: 1.5rem"
+                    >
                         <strong>ರೂ.</strong>
-                        {{ frappe.format(doc.get("paid_amount") or doc.get("received_amount") or
-                        doc.get("base_paid_amount") or 0,
-                        {'fieldtype': 'Currency'}) }}
+                        {{ frappe.format(doc.get("paid_amount") or
+                        doc.get("received_amount") or
+                        doc.get("base_paid_amount") or 0, {'fieldtype':
+                        'Currency'}) }}
                     </div>
                     <div class="p-2 flex-grow-1">ಹಣ ಕೊಟ್ಟವರ ಸಹಿ</div>
                     <div class="p-2 flex-grow-1 text-end">ಹಣ ಪಡೆದವರ ಸಹಿ</div>
                 </div>
+            </div>
+            <hr />
+            <div class="row">
+                <p>
+                    <span>
+                        Donations made to
+                        <strong
+                            >Jilla Brahmana Mahasabha / Surabhi Goshale</strong
+                        >
+                        is exempted U/S 80G of Income Tax ACt 1961 vide
+                        certificate No. AAAAJ7429FF20221, w.e.f 24.06.2022.
+                        Donations of Rs: 2000/- and above in cash is not
+                        exempted U/S 80G of Income Tax Act 1961
+                    </span>
+                </p>
             </div>
         </div>
     </div>
