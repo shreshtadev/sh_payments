@@ -1,15 +1,9 @@
 {%- from "templates/print_formats/standard_macros.html" import add_header -%}
-<link
-    href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/css/bootstrap.min.css"
-    rel="stylesheet"
-    integrity="sha384-LN+7fdVzj6u52u30Kp6M/trliBMCMKTyK833zpbD+pXdCLuTusPj697FH4R/5mcr"
-    crossorigin="anonymous"
-/>
-<script
-    src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/js/bootstrap.bundle.min.js"
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/css/bootstrap.min.css" rel="stylesheet"
+    integrity="sha384-LN+7fdVzj6u52u30Kp6M/trliBMCMKTyK833zpbD+pXdCLuTusPj697FH4R/5mcr" crossorigin="anonymous" />
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/js/bootstrap.bundle.min.js"
     integrity="sha384-ndDqU0Gzau9qJ1lfW4pNLlhNTkCfHzAVBReH9diLvGRem5+R9g2FzA8ZGN954O5Q"
-    crossorigin="anonymous"
-></script>
+    crossorigin="anonymous"></script>
 <style>
     .card {
         border: 2.5px solid #222 !important;
@@ -83,14 +77,9 @@
 </style>
 <div class="print-format">
     <div class="card border-dark bg-white">
-        <div
-            class="card-header text-center print-heading position-relative bg-white border-0"
-        >
+        <div class="card-header text-center print-heading position-relative bg-white border-0">
             <div style="font-size: 1.2rem">ॐ</div>
-            <h5
-                class="mb-0 print-heading-label"
-                style="color: #222; font-size: 1.6rem"
-            >
+            <h5 class="mb-0 print-heading-label" style="color: #222; font-size: 1.6rem">
                 ಶಿವಮೊಗ್ಗ ಜಿಲ್ಲಾ ಬ್ರಾಹ್ಮಣ ಮಹಾಸಭಾ (ರಿ.),
             </h5>
             <div style="font-size: 1rem">
@@ -103,11 +92,8 @@
             <div class="row mb-2">
                 <div class="col-6">
                     <strong>ವೌಚರ್ ಸಂಖ್ಯೆ</strong>
-                    <span
-                        class="ms-2 border-bottom border-dark d-inline-block"
-                        style="min-width: 80px; min-height: 1.5em"
-                        >{{ doc.name }}</span
-                    >
+                    <span class="ms-2 border-bottom border-dark d-inline-block"
+                        style="min-width: 80px; min-height: 1.5em">{{ doc.name }}</span>
                 </div>
                 <div class="col-6 text-end">
                     <strong>ದಿನಾಂಕ:</strong>
@@ -117,10 +103,7 @@
             <div class="row mb-2">
                 <div class="col-12">
                     <strong>ಖಾತೆಯ ಹೆಸರು</strong>
-                    <span
-                        class="ms-2 border-bottom border-dark d-inline-block w-75"
-                        style="min-height: 1.5em"
-                    ></span>
+                    <span class="ms-2 border-bottom border-dark d-inline-block w-75" style="min-height: 1.5em"></span>
                 </div>
             </div>
             <div class="row mb-2">
@@ -149,10 +132,7 @@
             </div>
             <div class="row mt-4">
                 <div class="col-4">
-                    <div
-                        class="border border-dark rounded p-2 text-center"
-                        style="width: 120px"
-                    >
+                    <div class="border border-dark rounded p-2 text-center" style="width: 120px">
                         <strong>ರೂ.</strong>
                         {{ frappe.format(doc.get("paid_amount") or
                         doc.get("received_amount") or
@@ -161,11 +141,12 @@
                     </div>
                 </div>
                 <div class="col-4">
-                    <span><strong>ಹಣ ಕೊಟ್ಟವರ ಸಹಿ</strong></span>
-                </div>
-                <div class="col-4 text-end">
                     <span><strong>ಹಣ ಪಡೆದವರ ಸಹಿ</strong></span>
                 </div>
+                <div class="col-4 text-end">
+                    <span><strong>ಹಣ ಕೊಟ್ಟವರ ಸಹಿ</strong></span>
+                </div>
+
             </div>
         </div>
     </div>

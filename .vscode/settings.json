@@ -1,3 +1,12 @@
 {
-    "python.languageServer": "Pylance"
+  "python.languageServer": "Pylance",
+  "python.analysis.autoSearchPaths": true,
+  "python.analysis.autoIndent": true,
+  "python.analysis.extraPaths": [
+    "../../env/lib/python3.12/site-packages"
+  ],
+  "editor.formatOnSave": true,
+  "[python]": {
+    "editor.defaultFormatter": "charliermarsh.ruff"
+  }
 }
