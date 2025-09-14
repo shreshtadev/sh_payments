@@ -137,13 +137,14 @@ app_license = "mit"
 # ---------------
 # Hook on document methods and events
 
-# doc_events = {
-# 	"*": {
-# 		"on_update": "method",
-# 		"on_cancel": "method",
-# 		"on_trash": "method"
-# 	}
-# }
+doc_events = {
+    # 	"*": {
+    # 		"on_update": "method",
+    # 		"on_cancel": "method",
+    # 		"on_trash": "method"
+    # 	}
+    "Sales Invoice": {"onload": "sh_payments.print_hooks.attach_tax_summary"}
+}
 
 # Scheduled Tasks
 # ---------------
@@ -175,7 +176,7 @@ app_license = "mit"
 # ------------------------------
 #
 # override_whitelisted_methods = {
-# 	"frappe.desk.doctype.event.event.get_events": "sh_payments.event.get_events"
+#     "frappe.www.printview.get_context": "print_hooks.get_context"
 # }
 #
 # each overriding function accepts a `data` argument;
@@ -242,4 +243,8 @@ app_license = "mit"
 # 	"Logging DocType Name": 30  # days to retain logs
 # }
 
-fixtures = ["Print Format"]
+fixtures = [
+    "Print Format",
+    {"dt": "Custom Field", "filters": [["dt", "=", "Sales Invoice"]]},
+    {"dt": "Tax Summary"},  # Your child DocType
+]

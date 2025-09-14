@@ -1,0 +1,97 @@
+{
+ "actions": [],
+ "autoname": "hash",
+ "creation": "2025-09-13 18:35:53.777666",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "item_tax_type",
+  "total_gst_amount",
+  "net_amount",
+  "gst_rate",
+  "column_break_iucb",
+  "total_cgst_amount",
+  "total_sgst_amount",
+  "sgst_rate",
+  "cgst_rate"
+ ],
+ "fields": [
+  {
+   "fieldname": "item_tax_type",
+   "fieldtype": "Data",
+   "label": "Item Tax Type",
+   "read_only": 1
+  },
+  {
+   "fieldname": "total_gst_amount",
+   "fieldtype": "Currency",
+   "label": "Total GST Amount",
+   "precision": "2",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_iucb",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "total_cgst_amount",
+   "fieldtype": "Currency",
+   "label": "Total CGST Amount",
+   "precision": "2",
+   "read_only": 1
+  },
+  {
+   "fieldname": "total_sgst_amount",
+   "fieldtype": "Currency",
+   "label": "Total SGST Amount",
+   "precision": "2",
+   "read_only": 1
+  },
+  {
+   "fieldname": "net_amount",
+   "fieldtype": "Currency",
+   "label": "Net Amount",
+   "precision": "2"
+  },
+  {
+   "fieldname": "gst_rate",
+   "fieldtype": "Float",
+   "label": "GST Rate",
+   "non_negative": 1,
+   "precision": "1",
+   "read_only": 1
+  },
+  {
+   "fieldname": "sgst_rate",
+   "fieldtype": "Float",
+   "label": "SGST Rate",
+   "non_negative": 1,
+   "precision": "1",
+   "read_only": 1
+  },
+  {
+   "fieldname": "cgst_rate",
+   "fieldtype": "Float",
+   "label": "CGST Rate",
+   "non_negative": 1,
+   "precision": "1",
+   "read_only": 1
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2025-09-14 17:55:16.998626",
+ "modified_by": "Administrator",
+ "module": "Shreshta Payments",
+ "name": "Tax Summary",
+ "naming_rule": "Random",
+ "owner": "Administrator",
+ "permissions": [],
+ "row_format": "Dynamic",
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}

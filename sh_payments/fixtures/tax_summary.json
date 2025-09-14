@@ -1,0 +1,53 @@
+[
+ {
+  "cgst_rate": 9.0,
+  "docstatus": 0,
+  "doctype": "Tax Summary",
+  "gst_rate": 18.0,
+  "item_tax_type": "GST 18%",
+  "modified": "2025-09-14 15:21:00.901667",
+  "name": "81hl76n1b5",
+  "net_amount": 4680.37,
+  "parent": "SINV-25-00002",
+  "parentfield": "si_tax_summary",
+  "parenttype": "Sales Invoice",
+  "sgst_rate": 9.0,
+  "total_cgst_amount": 421.23,
+  "total_gst_amount": 842.47,
+  "total_sgst_amount": 421.23
+ },
+ {
+  "cgst_rate": 6.0,
+  "docstatus": 0,
+  "doctype": "Tax Summary",
+  "gst_rate": 12.0,
+  "item_tax_type": "GST 12%",
+  "modified": "2025-09-14 15:21:00.901667",
+  "name": "81h78o0hbi",
+  "net_amount": 5611.6,
+  "parent": "SINV-25-00002",
+  "parentfield": "si_tax_summary",
+  "parenttype": "Sales Invoice",
+  "sgst_rate": 6.0,
+  "total_cgst_amount": 336.69,
+  "total_gst_amount": 673.39,
+  "total_sgst_amount": 336.69
+ },
+ {
+  "cgst_rate": 2.5,
+  "docstatus": 0,
+  "doctype": "Tax Summary",
+  "gst_rate": 5.0,
+  "item_tax_type": "GST 5%",
+  "modified": "2025-09-14 15:21:00.901667",
+  "name": "81hhq6rtku",
+  "net_amount": 142.86,
+  "parent": "SINV-25-00002",
+  "parentfield": "si_tax_summary",
+  "parenttype": "Sales Invoice",
+  "sgst_rate": 2.5,
+  "total_cgst_amount": 3.57,
+  "total_gst_amount": 7.14,
+  "total_sgst_amount": 3.57
+ }
+]
