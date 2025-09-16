@@ -28,29 +28,26 @@ def get_tax_summary(doc):
     )
 
     for item in doc.items:
-        key = item.item_tax_template
         cgst = item.cgst_amount or 0
         sgst = item.sgst_amount or 0
         net = item.net_amount or 0
         cgst_rate = item.cgst_rate or 0
         sgst_rate = item.sgst_rate or 0
+        gst_rate = cgst_rate + sgst_rate
 
-        summary[key]["total_cgst_amount"] += cgst
-        summary[key]["total_sgst_amount"] += sgst
-        summary[key]["total_gst_amount"] += cgst + sgst
-        summary[key]["net_amount"] += net
-        summary[key]["cgst_rate"] = cgst_rate if None else cgst_rate
-        summary[key]["sgst_rate"] = sgst_rate if None else sgst_rate
-        summary[key]["gst_rate"] = (
-            (cgst_rate + sgst_rate) if None else (cgst_rate + sgst_rate)
-        )
+        summary[gst_rate]["total_cgst_amount"] += cgst
+        summary[gst_rate]["total_sgst_amount"] += sgst
+        summary[gst_rate]["total_gst_amount"] += cgst + sgst
+        summary[gst_rate]["net_amount"] += net
+        summary[gst_rate]["cgst_rate"] = cgst_rate
+        summary[gst_rate]["sgst_rate"] = sgst_rate
+        summary[gst_rate]["gst_rate"] = cgst_rate + sgst_rate
 
     item_summary = [
         {
-            "item_tax_template": k,
-            "cgst_rate": v["cgst_rate"],
-            "sgst_rate": v["sgst_rate"],
-            "gst_rate": v["gst_rate"],
+            "cgst_rate": round(v["cgst_rate"], 1),
+            "sgst_rate": round(v["sgst_rate"], 1),
+            "gst_rate": round(v["gst_rate"], 1),
             "total_cgst_amount": round(v["total_cgst_amount"], 2),
             "total_sgst_amount": round(v["total_sgst_amount"], 2),
             "total_gst_amount": round(v["total_gst_amount"], 2),

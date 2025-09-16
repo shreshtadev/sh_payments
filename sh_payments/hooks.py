@@ -143,7 +143,9 @@ doc_events = {
     # 		"on_cancel": "method",
     # 		"on_trash": "method"
     # 	}
-    "Sales Invoice": {"onload": "sh_payments.print_hooks.attach_tax_summary"}
+    "Sales Invoice": {
+        "before_submit": "sh_payments.print_hooks.attach_tax_summary",
+    }
 }
 
 # Scheduled Tasks
