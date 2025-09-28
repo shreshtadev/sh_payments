@@ -18,7 +18,7 @@ class CSVProcessor:
         
         self.s_res_path = os.path.join(result_dir, "suppliers.txt")
         
-        self.addr_err_path = os.path.join(result_dir "addr_err.txt")
+        self.addr_err_path = os.path.join(result_dir, "addr_err.txt")
 
         self.cerr_res_path = os.path.join(result_dir, "customers_err.txt")
 
@@ -273,7 +273,7 @@ class CSVProcessor:
 
 
 def execute():
-    DATA_CSV_BASE_PATH = "./data"  # This can be made dynamic if needed
+    DATA_CSV_BASE_PATH = os.path.join(os.path.dirname(__file__),"data" )  # This can be made dynamic if needed
 
     customers_csv_path = os.path.join(
         os.path.dirname(__file__), DATA_CSV_BASE_PATH, "customers_1.csv"
