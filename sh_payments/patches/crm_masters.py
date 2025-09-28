@@ -174,7 +174,7 @@ class CSVProcessor:
                             "state": doc_data["state"],
                             "city": found_pincode[0],
                             "country": "India",
-                            "pincode": doc_data["pinCode"]
+                            "pincode": doc_data["pinCode"],
                             "is_primary_address": 1,
                         }
                     )
