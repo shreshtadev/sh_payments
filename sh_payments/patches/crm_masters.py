@@ -1,7 +1,9 @@
 import csv
+import json
+import logging
 import os
 import traceback
-import logging
+
 import frappe
 import pandas as pd
 
@@ -9,16 +11,16 @@ import pandas as pd
 class CSVProcessor:
     def __init__(self, data_csv_base_path: str):
         self.data_csv_base_path = data_csv_base_path
-        
+
         # Create result directory if it doesn't exist
         result_dir = os.path.join(self.data_csv_base_path, "result")
         os.makedirs(result_dir, exist_ok=True)
         self.addr_res_path = os.path.join(result_dir, "addresses.txt")
-        
+
         self.c_res_path = os.path.join(result_dir, "customers.txt")
-        
+
         self.s_res_path = os.path.join(result_dir, "suppliers.txt")
-        
+
         self.addr_err_path = os.path.join(result_dir, "addr_err.txt")
 
         self.cerr_res_path = os.path.join(result_dir, "customers_err.txt")
@@ -26,7 +28,11 @@ class CSVProcessor:
         self.serr_res_path = os.path.join(result_dir, "suppliers_err.txt")
 
         self.prd_path = os.path.join(result_dir, "processed.txt")
-        logging.basicConfig(filename=os.path.join(result_dir, "crm_masters_err.log"), level=logging.ERROR, format='%(asctime)s - %(levelname)s - %(message)s')
+        logging.basicConfig(
+            filename=os.path.join(result_dir, "crm_masters_err.log"),
+            level=logging.ERROR,
+            format="%(asctime)s - %(levelname)s - %(message)s",
+        )
 
     @staticmethod
     def _get_pan_from_gstin(gstin: str) -> str:
@@ -144,7 +150,7 @@ class CSVProcessor:
                 found_doc = frappe.get_doc(doctype, doc_data.get("name", ""))
             except frappe.exceptions.DoesNotExistError:
                 found_doc = None
-            
+
             total_docs.append(doc_data["name"])
 
             if found_doc is not None:
@@ -185,10 +191,13 @@ class CSVProcessor:
                     try:
                         inserted_addr = doc_to_insert.save()
                         address_docs.append(inserted_addr.name)
-                    except Exception as e:
+                    except Exception:
                         addr_err_docs.append(found_doc.name)
                         exception_detail = traceback.format_exc()
-                        logging.error("An unexpected error occurred during data processing:\n%s", exception_detail)
+                        logging.error(
+                            "An unexpected error occurred during data processing:\n%s",
+                            exception_detail,
+                        )
 
             else:
                 processed_docs.append(doc_data["name"])
@@ -251,17 +260,21 @@ class CSVProcessor:
                     try:
                         saved_address = address_doc.save()
                         address_docs.append(saved_address.name)
-                    except Exception as e:
+                    except Exception:
                         addr_err_docs.append(doc_data["name"] + " Address")
                         exception_detail = traceback.format_exc()
-                        logging.error("An unexpected error occurred during data processing(2):\n%s", exception_detail)
+                        logging.error(
+                            "An unexpected error occurred during data processing(2):\n%s",
+                            exception_detail,
+                        )
 
-
-                except Exception as e:
-                    error_docs.append(doc_data["name"])
+                except Exception:
+                    error_docs.append(json.dumps(doc_data))
                     exception_detail = traceback.format_exc()
-                    logging.error("An unexpected error occurred during data processing(3):\n%s", exception_detail)
-
+                    logging.error(
+                        "An unexpected error occurred during data processing(3):\n%s",
+                        exception_detail,
+                    )
 
         if len(processed_docs) > 0:
             pd.Series(processed_docs).to_csv(self.prd_path, index=False)
@@ -284,7 +297,9 @@ class CSVProcessor:
 
 
 def execute():
-    DATA_CSV_BASE_PATH = os.path.join(os.path.dirname(__file__),"data" )  # This can be made dynamic if needed
+    DATA_CSV_BASE_PATH = os.path.join(
+        os.path.dirname(__file__), "data"
+    )  # This can be made dynamic if needed
 
     customers_csv_path = os.path.join(
         os.path.dirname(__file__), DATA_CSV_BASE_PATH, "customers_1.csv"
