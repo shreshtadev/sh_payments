@@ -142,7 +142,7 @@ class CSVProcessor:
         pincode_df: pd.DataFrame,
     ) -> Document | None:
         """Creates and saves an Address document."""
-        pincode = doc_data.get("pinCode")
+        pincode = doc_data.get("pinCode") or ""
         districts = self.find_district_by_pincode(pincode_df, pincode)
         if not districts:
             logging.error(f"No district found for pincode {pincode} for {link_name}")
@@ -287,13 +287,16 @@ class CSVProcessor:
                     saved_doc = self._create_party(doctype, doc_data)
                     if saved_doc and getattr(saved_doc, "name", None):
                         results["processed"].append(saved_doc.name)
-                        address = self._create_address(
-                            doctype, saved_doc.name, doc_data, pincode_df
-                        )
-                        if address:
-                            results["addresses"].append(address.name)
+                        if saved_doc.name is not None:
+                            address = self._create_address(
+                                doctype, saved_doc.name, doc_data, pincode_df
+                            )
+                            if address:
+                                results["addresses"].append(address.name)
+                            else:
+                                results["addr_errors"].append(doc_name + " (Address)")
                         else:
-                            results["addr_errors"].append(doc_name + " (Address)")
+                            results["addr_errors"].append(doc_name + " (No Name)")
                     else:
                         results["errors"].append(json.dumps(doc_data))
             except Exception as e:
