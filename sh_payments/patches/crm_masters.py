@@ -1,6 +1,7 @@
 import csv
 import os
-
+import traceback
+import logging
 import frappe
 import pandas as pd
 
@@ -25,6 +26,7 @@ class CSVProcessor:
         self.serr_res_path = os.path.join(result_dir, "suppliers_err.txt")
 
         self.prd_path = os.path.join(result_dir, "processed.txt")
+        logging.basicConfig(filename=os.path.join(result_dir, "crm_masters_err.log"), level=logging.ERROR, format='%(asctime)s - %(levelname)s - %(message)s')
 
     @staticmethod
     def _get_pan_from_gstin(gstin: str) -> str:
@@ -183,8 +185,11 @@ class CSVProcessor:
                     try:
                         inserted_addr = doc_to_insert.save()
                         address_docs.append(inserted_addr.name)
-                    except Exception:
+                    except Exception as e:
                         addr_err_docs.append(found_doc.name)
+                        exception_detail = traceback.format_exc()
+                        logging.error("An unexpected error occurred during data processing:\n%s", exception_detail)
+
             else:
                 processed_docs.append(doc_data["name"])
                 doc_to_insert = frappe.get_doc(
@@ -246,11 +251,17 @@ class CSVProcessor:
                     try:
                         saved_address = address_doc.save()
                         address_docs.append(saved_address.name)
-                    except Exception:
+                    except Exception as e:
                         addr_err_docs.append(doc_data["name"] + " Address")
+                        exception_detail = traceback.format_exc()
+                        logging.error("An unexpected error occurred during data processing(2):\n%s", exception_detail)
 
-                except Exception:
+
+                except Exception as e:
                     error_docs.append(doc_data["name"])
+                    exception_detail = traceback.format_exc()
+                    logging.error("An unexpected error occurred during data processing(3):\n%s", exception_detail)
+
 
         if len(processed_docs) > 0:
             pd.Series(processed_docs).to_csv(self.prd_path, index=False)
