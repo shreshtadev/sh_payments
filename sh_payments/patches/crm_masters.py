@@ -1,16 +1,14 @@
-import concurrent.futures
 import csv
 import json
 import logging
 import os
-import threading
 import traceback
 from typing import Any, Dict, Generator, List
 
 import frappe
 import pandas as pd
-from frappe import Document
 from frappe.exceptions import NotFound
+from frappe.model.document import Document
 
 # Constants for DocTypes and other magic strings
 CUSTOMER_DOCTYPE = "Customer"
@@ -54,14 +52,49 @@ class CSVProcessor:
             format="%(asctime)s - %(levelname)s - %(message)s",
         )
 
-        self.write_lock = threading.Lock()
-
     @staticmethod
     def _get_pan_from_gstin(gstin: str) -> str:
         """Extracts PAN from a GSTIN number."""
         if gstin and len(gstin) >= 12:
             return gstin[2:12]
         return ""
+
+    @staticmethod
+    def _clean_gstin(gstin: str) -> str:
+        """Cleans and validates GSTIN. Returns empty string if invalid."""
+        if not gstin:
+            return ""
+
+        gstin = gstin.strip().upper()
+
+        # GSTIN should be exactly 15 characters
+        if len(gstin) != 15:
+            return ""
+
+        # Basic format check - should be alphanumeric
+        if not gstin.isalnum():
+            return ""
+
+        return gstin
+
+    @staticmethod
+    def _clean_name(name: str) -> str:
+        """Cleans name to remove invalid characters for Frappe naming."""
+        if not name:
+            return ""
+
+        # Remove or replace special characters that cause naming issues
+        import re
+
+        name = name.strip()
+        # Replace problematic characters
+        name = re.sub(r'[<>"&]', "", name)
+        # Replace multiple spaces with single space
+        name = re.sub(r"\s+", " ", name)
+        # Remove leading/trailing spaces
+        name = name.strip()
+
+        return name
 
     @staticmethod
     def _read_csv_rows(filename: str) -> Generator[Dict[str, Any], None, None]:
@@ -118,11 +151,18 @@ class CSVProcessor:
 
     def _prepare_doc_data(self, row: Dict[str, Any], doctype: str) -> Dict[str, Any]:
         """Prepares a dictionary of data for a Customer or Supplier from a CSV row."""
-        customer_name = row.get("customer_name", "").replace('"', "").strip()
-        gstin = row.get("gstin", "").strip()
+        # Get the appropriate name field based on doctype
+        if doctype == SUPPLIER_DOCTYPE:
+            name = self._clean_name(row.get("supplier_name", ""))
+            type_field = row.get("supplier_type", "").strip()
+        else:
+            name = self._clean_name(row.get("customer_name", ""))
+            type_field = row.get("customer_type", "").strip()
+
+        gstin = self._clean_gstin(row.get("gstin", ""))
 
         return {
-            "name": customer_name,
+            "name": name,
             "gstin": gstin,
             "pan": self._get_pan_from_gstin(gstin),
             "group": "Commercial" if doctype == CUSTOMER_DOCTYPE else "Services",
@@ -131,7 +171,7 @@ class CSVProcessor:
             "addressLine1": row.get("address", "").strip(),
             "pinCode": row.get("pincode", "").strip(),
             "state": row.get("state", "").strip(),
-            "registrationType": row.get("customer_type", "").strip(),
+            "registrationType": type_field,
         }
 
     def _create_address(
@@ -144,9 +184,46 @@ class CSVProcessor:
         """Creates and saves an Address document."""
         pincode = doc_data.get("pinCode") or ""
         districts = self.find_district_by_pincode(pincode_df, pincode)
+
+        # If no district found, use the state as city or a default
         if not districts:
-            logging.error(f"No district found for pincode {pincode} for {link_name}")
-            return None
+            if pincode:
+                logging.error(
+                    f"No district found for pincode {pincode} for {link_name}"
+                )
+            # Use state as city if available, otherwise use a default
+            city = doc_data.get("state", "Unknown").strip()
+            if not city:
+                city = "Unknown"
+        else:
+            city = districts[0]
+
+        address_type = "Billing" if doctype == CUSTOMER_DOCTYPE else "Shipping"
+        gst_category = "Unregistered" if not doc_data["gstin"] else "Registered Regular"
+
+        # Clean up address line to avoid issues
+        address_line1 = doc_data["addressLine1"]
+        if not address_line1:
+            address_line1 = "Address not provided"
+
+        # Validate state - use Karnataka as default if empty or invalid
+        state = doc_data.get("state", "").strip()
+        if not state or state.lower() in ["unknown", "null", "none", ""]:
+            state = "Karnataka"  # Default to Karnataka since most addresses seem to be from Karnataka
+
+        # Clean pincode for validation
+        clean_pincode = ""
+        if pincode:
+            try:
+                # Only include if it's a valid 6-digit number
+                if (
+                    pincode.isdigit()
+                    and len(pincode) == 6
+                    and not pincode.startswith("0")
+                ):
+                    clean_pincode = pincode
+            except Exception:
+                pass
 
         address_doc = frappe.get_doc(
             {
@@ -154,9 +231,7 @@ class CSVProcessor:
                 "address_title": f"{link_name} Address",
                 "gstin": doc_data["gstin"],
                 "pan": doc_data["pan"],
-                "gst_category": "Unregistered"
-                if not doc_data["gstin"]
-                else "Registered Regular",
+                "gst_category": gst_category,
                 "links": [
                     {
                         "doctype": DYNAMIC_LINK_DOCTYPE,
@@ -164,14 +239,12 @@ class CSVProcessor:
                         "link_name": link_name,
                     }
                 ],
-                "address_type": "Billing"
-                if doctype == CUSTOMER_DOCTYPE
-                else "Shipping",
-                "address_line1": doc_data["addressLine1"],
-                "state": doc_data["state"],
-                "city": districts[0],
+                "address_type": address_type,
+                "address_line1": address_line1,
+                "state": state,
+                "city": city,
                 "country": "India",
-                "pincode": pincode,
+                "pincode": clean_pincode,
                 "is_primary_address": 1,
             }
         )
@@ -188,9 +261,7 @@ class CSVProcessor:
             )
             return None
 
-    def _create_party(
-        self, doctype: str, doc_data: Dict[str, Any]
-    ) -> frappe.Document | None:
+    def _create_party(self, doctype: str, doc_data: Dict[str, Any]) -> Document | None:
         """Creates and saves a Customer or Supplier document."""
         party_doc = frappe.get_doc(
             {
@@ -205,15 +276,15 @@ class CSVProcessor:
         )
 
         if doctype == SUPPLIER_DOCTYPE:
-            party_doc.supplier_name = doc_data["name"]
-            party_doc.supplier_type = doc_data["type"]
-            party_doc.supplier_group = doc_data["group"]
-            party_doc.default_price_list = "Standard Buying"
+            setattr(party_doc, "supplier_name", doc_data["name"])
+            setattr(party_doc, "supplier_type", doc_data["type"])
+            setattr(party_doc, "supplier_group", doc_data["group"])
+            setattr(party_doc, "default_price_list", "Standard Buying")
         elif doctype == CUSTOMER_DOCTYPE:
-            party_doc.customer_name = doc_data["name"]
-            party_doc.customer_type = doc_data["type"]
-            party_doc.customer_group = doc_data["group"]
-            party_doc.default_price_list = "Standard Selling"
+            setattr(party_doc, "customer_name", doc_data["name"])
+            setattr(party_doc, "customer_type", doc_data["type"])
+            setattr(party_doc, "customer_group", doc_data["group"])
+            setattr(party_doc, "default_price_list", "Standard Selling")
 
         try:
             return party_doc.save(ignore_permissions=True)
@@ -248,8 +319,12 @@ class CSVProcessor:
         }
 
         try:
+            # Get the correct field name for each doctype
+            name_field_in_csv = (
+                "supplier_name" if doctype == SUPPLIER_DOCTYPE else "customer_name"
+            )
             csv_doc_names = [
-                row.get("customer_name", "").replace('"', "").strip()
+                row.get(name_field_in_csv, "").replace('"', "").strip()
                 for row in self._read_csv_rows(file_path)
             ]
         except Exception as e:
@@ -316,21 +391,20 @@ class CSVProcessor:
         )
 
     def _write_results(self, doctype: str, results: Dict[str, Any]):
-        """Writes the processing results to their respective files, handling concurrent writes."""
-        # Use a lock for shared files and append mode
-        with self.write_lock:
-            if results["processed"]:
-                pd.Series(results["processed"]).to_csv(
-                    self.paths["processed"], mode="a", index=False, header=False
-                )
-            if results["addresses"]:
-                pd.Series(results["addresses"]).to_csv(
-                    self.paths["addr_res"], mode="a", index=False, header=False
-                )
-            if results["addr_errors"]:
-                pd.Series(results["addr_errors"]).to_csv(
-                    self.paths["addr_err"], mode="a", index=False, header=False
-                )
+        """Writes the processing results to their respective files."""
+        # Write shared files in append mode
+        if results["processed"]:
+            pd.Series(results["processed"]).to_csv(
+                self.paths["processed"], mode="a", index=False, header=False
+            )
+        if results["addresses"]:
+            pd.Series(results["addresses"]).to_csv(
+                self.paths["addr_res"], mode="a", index=False, header=False
+            )
+        if results["addr_errors"]:
+            pd.Series(results["addr_errors"]).to_csv(
+                self.paths["addr_err"], mode="a", index=False, header=False
+            )
 
         # Doctype-specific files are not shared, no lock needed, use write mode.
         path_map = {
@@ -363,7 +437,7 @@ def process_doctype_task(processor, file_path, doctype, pincode_df):
             f"Error processing {doctype}. Rolling back changes.\n{traceback.format_exc()}"
         )
         frappe.db.rollback()
-        # Re-raise to be caught by the future.result() call
+        # Re-raise to be caught by the caller
         raise
 
 
@@ -393,25 +467,19 @@ def execute():
         {"doctype": CUSTOMER_DOCTYPE, "file_path": paths["customers"]},
     ]
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
-        future_to_doctype = {
-            executor.submit(
-                process_doctype_task,
+    # Process each doctype sequentially
+    for task in tasks_to_run:
+        doctype_name = task["doctype"]
+        try:
+            result = process_doctype_task(
                 processor,
                 task["file_path"],
                 task["doctype"],
                 pincode_df,
-            ): task["doctype"]
-            for task in tasks_to_run
-        }
-
-        for future in concurrent.futures.as_completed(future_to_doctype):
-            doctype_name = future_to_doctype[future]
-            try:
-                result = future.result()
-                print(f"{doctype_name.upper()}S: {result}")
-            except Exception as exc:
-                print(f"An error occurred while processing {doctype_name}: {exc}")
-                # Error is already logged by the task wrapper
+            )
+            print(f"{doctype_name.upper()}S: {result}")
+        except Exception as exc:
+            print(f"An error occurred while processing {doctype_name}: {exc}")
+            # Error is already logged by the task wrapper
 
     print("\nProcessing finished.")
