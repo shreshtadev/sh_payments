@@ -1,331 +1,412 @@
+import concurrent.futures
 import csv
 import json
 import logging
 import os
+import threading
 import traceback
+from typing import Any, Dict, Generator, List
 
 import frappe
 import pandas as pd
 
+# Constants for DocTypes and other magic strings
+CUSTOMER_DOCTYPE = "Customer"
+SUPPLIER_DOCTYPE = "Supplier"
+ADDRESS_DOCTYPE = "Address"
+DYNAMIC_LINK_DOCTYPE = "Dynamic Link"
+
 
 class CSVProcessor:
+    """
+    Processes CSV files to create or update Customer and Supplier documents and their addresses in Frappe.
+    """
+
     def __init__(self, data_csv_base_path: str):
         self.data_csv_base_path = data_csv_base_path
-
-        # Create result directory if it doesn't exist
         result_dir = os.path.join(self.data_csv_base_path, "result")
         os.makedirs(result_dir, exist_ok=True)
-        self.addr_res_path = os.path.join(result_dir, "addresses.txt")
 
-        self.c_res_path = os.path.join(result_dir, "customers.txt")
+        self.paths = {
+            "addr_res": os.path.join(result_dir, "addresses.txt"),
+            "cust_res": os.path.join(result_dir, "customers.txt"),
+            "supp_res": os.path.join(result_dir, "suppliers.txt"),
+            "addr_err": os.path.join(result_dir, "addr_err.txt"),
+            "cust_err": os.path.join(result_dir, "customers_err.txt"),
+            "supp_err": os.path.join(result_dir, "suppliers_err.txt"),
+            "processed": os.path.join(result_dir, "processed.txt"),
+            "log": os.path.join(result_dir, "crm_masters_err.log"),
+        }
 
-        self.s_res_path = os.path.join(result_dir, "suppliers.txt")
+        # Clean up old result files to ensure a fresh run
+        for path in self.paths.values():
+            if os.path.exists(path):
+                try:
+                    os.remove(path)
+                except OSError as e:
+                    print(f"Error removing file {path}: {e}")
 
-        self.addr_err_path = os.path.join(result_dir, "addr_err.txt")
-
-        self.cerr_res_path = os.path.join(result_dir, "customers_err.txt")
-
-        self.serr_res_path = os.path.join(result_dir, "suppliers_err.txt")
-
-        self.prd_path = os.path.join(result_dir, "processed.txt")
         logging.basicConfig(
-            filename=os.path.join(result_dir, "crm_masters_err.log"),
-            level=logging.ERROR,
+            filename=self.paths["log"],
+            level=logging.INFO,
             format="%(asctime)s - %(levelname)s - %(message)s",
         )
 
+        self.write_lock = threading.Lock()
+
     @staticmethod
     def _get_pan_from_gstin(gstin: str) -> str:
-        # PAN is characters 3 to 12 in GSTIN (index 2:12)
-        if len(gstin) >= 12:
+        """Extracts PAN from a GSTIN number."""
+        if gstin and len(gstin) >= 12:
             return gstin[2:12]
         return ""
 
     @staticmethod
-    def _read_csv_batch(filename: str, batch_size: int = 10):
-        """
-        A generator to read a CSV file in specified batches.
-        """
-        batch = []
-        with open(filename, "r", newline="") as csvfile:
-            csv_reader = csv.DictReader(csvfile)
-            for row in csv_reader:
-                batch.append(row)
-                if len(batch) >= batch_size:
-                    yield batch
-                    batch = []
-            # Yield any remaining rows in the last batch
-            if batch:
-                yield batch
-
-    @staticmethod
-    def _read_csv_row(filename: str):
-        """
-        A generator to read a CSV file.
-        """
-        with open(filename, "r", newline="") as csvfile:
-            csv_reader = csv.DictReader(csvfile)
-            for row in csv_reader:
-                yield row
-
-    def get_linked_addresses(self, link_doctype: str, link_name: str) -> list[str]:
-        linked_records = list()
-        address_names = list[str]()
-        """
-        Finds the names (IDs) of all Address documents linked to a specific document.
-
-        :param client: The authenticated FrappeClient instance.
-        :param link_doctype: The DocType of the document to check (e.g., 'Customer').
-        :param link_name: The 'name' (ID) of the specific document (e.g., 'CUST/00001').
-        :return: A list of Address document names (e.g., ['ADDR00001', 'ADDR00002']).
-        """
-        # Query the Dynamic Link DocType
-        linked_records = frappe.get_list(
-            doctype="Address",
-            filters=[
-                ["Dynamic Link", "link_doctype", "=", link_doctype],
-                ["Dynamic Link", "link_name", "=", link_name],
-            ],
-            # We only need the 'parent' field, which holds the Name (ID) of the Address document.
-            fields="name",
-        )
-        if linked_records is not None:
-            # Extract the Address names from the list of dictionaries
-            address_names = [record.get("parent") for record in linked_records]
-
-        return address_names
-
-    def has_address(self, doctype, name: str) -> bool:
-        """
-        Checks if a Customer has any linked addresses using the FrappeClient.
-        """
-        addresses = self.get_linked_addresses(doctype, name)
-        return bool(addresses)
-
-    def find_district_by_pincode(self, indexed_df: pd.DataFrame, pincode: str):
+    def _read_csv_rows(filename: str) -> Generator[Dict[str, Any], None, None]:
+        """A generator to read a CSV file row by row, handling potential encoding errors."""
         try:
-            result = indexed_df.loc[pincode, "District"]
-            if isinstance(result, pd.Series):
-                return result.unique().tolist()
-            return [result]
-        except KeyError:
+            with open(filename, "r", newline="", encoding="utf-8") as csvfile:
+                for row in csv.DictReader(csvfile):
+                    yield row
+        except UnicodeDecodeError:
+            logging.warning(
+                f"UTF-8 decoding failed for {filename}. Trying with 'latin-1'."
+            )
+            with open(filename, "r", newline="", encoding="latin-1") as csvfile:
+                for row in csv.DictReader(csvfile):
+                    yield row
+        except Exception as e:
+            logging.error(f"Could not read CSV file {filename}: {e}")
+            return
+
+    def get_linked_addresses(self, link_doctype: str, link_name: str) -> List[str]:
+        """Finds the names of all Address documents linked to a specific document."""
+        try:
+            return frappe.get_list(
+                doctype=ADDRESS_DOCTYPE,
+                filters=[
+                    [DYNAMIC_LINK_DOCTYPE, "link_doctype", "=", link_doctype],
+                    [DYNAMIC_LINK_DOCTYPE, "link_name", "=", link_name],
+                ],
+                fields=["name"],
+                pluck="name",
+            )
+        except frappe.exceptions.FrappeException as e:
+            logging.error(f"Error fetching linked addresses for {link_name}: {e}")
             return []
 
-    def process_csv_data(self, file_path: str, doctype: str, indexed_df: pd.DataFrame):
-        old_docs = []
-        total_docs = []
-        processed_docs = []
-        error_docs = []
-        address_docs = []
-        addr_err_docs = []
+    def has_address(self, doctype: str, name: str) -> bool:
+        """Checks if a document has any linked addresses."""
+        return bool(self.get_linked_addresses(doctype, name))
 
-        for row in self._read_csv_row(filename=file_path):
-            doc_data = dict[str, str]()
-            customer_name = row[
-                "TALLYMESSAGE.LEDGER.LANGUAGENAME.LIST.NAME.LIST.NAME.text"
-            ]
-            customer_name.replace('"', "") if '"' in customer_name else customer_name
-            gstin = row["TALLYMESSAGE.LEDGER.LEDGSTREGDETAILS.LIST.GSTIN.text"]
-            doc_data["registrationType"] = row[
-                "TALLYMESSAGE.LEDGER.GSTREGISTRATIONTYPE.text"
-            ]
-            doc_data["name"] = customer_name
-            doc_data["gstin"] = gstin if gstin is not None else ""
-            doc_data["pan"] = self._get_pan_from_gstin(gstin) if gstin != "" else ""
-            doc_data["group"] = "Commercial" if doctype == "Customer" else "Services"
-            doc_data["type"] = "Company"
-            doc_data["currency"] = "INR"
-            doc_data["addressLine1"] = row[
-                "TALLYMESSAGE.LEDGER.LEDMAILINGDETAILS.LIST.ADDRESS.LIST.ADDRESS.text"
-            ]
-            doc_data["pinCode"] = row[
-                "TALLYMESSAGE.LEDGER.LEDMAILINGDETAILS.LIST.PINCODE.text"
-            ]
-            doc_data["state"] = row[
-                "TALLYMESSAGE.LEDGER.LEDMAILINGDETAILS.LIST.STATE.text"
-            ]
+    @staticmethod
+    def find_district_by_pincode(pincode_df: pd.DataFrame, pincode: str) -> List[str]:
+        """Finds district(s) for a given pincode from the dataframe."""
+        if not pincode:
+            return []
+        try:
+            pincode_int = int(pincode)
+            results = pincode_df[pincode_df["Pincode"] == pincode_int][
+                "District"
+            ].unique()
+            return results.tolist()
+        except (ValueError, TypeError):
+            logging.error(f"Invalid pincode format: {pincode}")
+            return []
 
-            # Check if document exists before trying to get it
-            try:
-                found_doc = frappe.get_doc(doctype, doc_data.get("name", ""))
-            except frappe.exceptions.DoesNotExistError:
-                found_doc = None
+    def _prepare_doc_data(self, row: Dict[str, Any], doctype: str) -> Dict[str, Any]:
+        """Prepares a dictionary of data for a Customer or Supplier from a CSV row."""
+        customer_name = row.get("customer_name", "").replace('"', "").strip()
+        gstin = row.get("gstin", "").strip()
 
-            total_docs.append(doc_data["name"])
+        return {
+            "name": customer_name,
+            "gstin": gstin,
+            "pan": self._get_pan_from_gstin(gstin),
+            "group": "Commercial" if doctype == CUSTOMER_DOCTYPE else "Services",
+            "type": "Company",
+            "currency": "INR",
+            "addressLine1": row.get("address", "").strip(),
+            "pinCode": row.get("pincode", "").strip(),
+            "state": row.get("state", "").strip(),
+            "registrationType": row.get("customer_type", "").strip(),
+        }
 
-            if found_doc is not None:
-                old_docs.append(found_doc.name)
-                is_found = self.has_address(doctype=doctype, name=str(found_doc.name))
-                found_pincode = self.find_district_by_pincode(
-                    indexed_df=indexed_df, pincode=doc_data["pinCode"]
-                )
-                if not is_found and len(found_pincode) > 0:
-                    doc_to_insert = frappe.get_doc(
-                        {
-                            "doctype": "Address",
-                            "gstin": doc_data["gstin"],
-                            "pan": doc_data["pan"],
-                            "gst_category": "Unregistered"
-                            if (doc_data["gstin"] is None or doc_data["gstin"] == "")
-                            else "Registered Regular",
-                            "links": [
-                                {
-                                    "doctype": "Dynamic Link",
-                                    "link_doctype": doctype,
-                                    "link_name": found_doc.name,
-                                }
-                            ],
-                            "address_type": (
-                                "Billing" if doctype == "Customer" else "Shipping"
-                            ),
-                            "address_line1": doc_data["addressLine1"],
-                            "state": doc_data["state"],
-                            "city": found_pincode[0],
-                            "country": "India",
-                            "pincode": doc_data["pinCode"],
-                            "is_primary_address": 1,
-                        }
-                    )
-                    # doc_to_insert["address_title"] = doc_data["name"] + " Address"
+    def _create_address(
+        self,
+        doctype: str,
+        link_name: str,
+        doc_data: Dict[str, Any],
+        pincode_df: pd.DataFrame,
+    ) -> frappe.Document | None:
+        """Creates and saves an Address document."""
+        pincode = doc_data.get("pinCode")
+        districts = self.find_district_by_pincode(pincode_df, pincode)
+        if not districts:
+            logging.error(f"No district found for pincode {pincode} for {link_name}")
+            return None
 
-                    try:
-                        inserted_addr = doc_to_insert.save()
-                        address_docs.append(inserted_addr.name)
-                    except Exception:
-                        addr_err_docs.append(found_doc.name)
-                        exception_detail = traceback.format_exc()
-                        logging.error(
-                            "An unexpected error occurred during data processing:\n%s",
-                            exception_detail,
-                        )
-
-            else:
-                processed_docs.append(doc_data["name"])
-                doc_to_insert = frappe.get_doc(
+        address_doc = frappe.get_doc(
+            {
+                "doctype": ADDRESS_DOCTYPE,
+                "address_title": f"{link_name} Address",
+                "gstin": doc_data["gstin"],
+                "pan": doc_data["pan"],
+                "gst_category": "Unregistered"
+                if not doc_data["gstin"]
+                else "Registered Regular",
+                "links": [
                     {
-                        "doctype": doctype,
-                        "default_currency": doc_data["currency"],
-                        "gstin": doc_data["gstin"],
-                        "pan": doc_data["pan"],
-                        "gst_category": "Unregistered"
-                        if (doc_data["gstin"] is None or doc_data["gstin"] == "")
-                        else "Registered Regular",
+                        "doctype": DYNAMIC_LINK_DOCTYPE,
+                        "link_doctype": doctype,
+                        "link_name": link_name,
                     }
+                ],
+                "address_type": "Billing"
+                if doctype == CUSTOMER_DOCTYPE
+                else "Shipping",
+                "address_line1": doc_data["addressLine1"],
+                "state": doc_data["state"],
+                "city": districts[0],
+                "country": "India",
+                "pincode": pincode,
+                "is_primary_address": 1,
+            }
+        )
+        try:
+            return address_doc.save(ignore_permissions=True)
+        except (frappe.ValidationError, frappe.DuplicateEntryError) as e:
+            logging.error(
+                f"Validation/Duplicate error for address of {doctype} {link_name}: {e}"
+            )
+            return None
+        except Exception:
+            logging.error(
+                f"Unexpected error saving address for {doctype} {link_name}:\n{traceback.format_exc()}"
+            )
+            return None
+
+    def _create_party(
+        self, doctype: str, doc_data: Dict[str, Any]
+    ) -> frappe.Document | None:
+        """Creates and saves a Customer or Supplier document."""
+        party_doc = frappe.get_doc(
+            {
+                "doctype": doctype,
+                "default_currency": doc_data["currency"],
+                "gstin": doc_data["gstin"],
+                "pan": doc_data["pan"],
+                "gst_category": "Unregistered"
+                if not doc_data["gstin"]
+                else "Registered Regular",
+            }
+        )
+
+        if doctype == SUPPLIER_DOCTYPE:
+            party_doc.supplier_name = doc_data["name"]
+            party_doc.supplier_type = doc_data["type"]
+            party_doc.supplier_group = doc_data["group"]
+            party_doc.default_price_list = "Standard Buying"
+        elif doctype == CUSTOMER_DOCTYPE:
+            party_doc.customer_name = doc_data["name"]
+            party_doc.customer_type = doc_data["type"]
+            party_doc.customer_group = doc_data["group"]
+            party_doc.default_price_list = "Standard Selling"
+
+        try:
+            return party_doc.save(ignore_permissions=True)
+        except (frappe.ValidationError, frappe.DuplicateEntryError) as e:
+            logging.error(
+                f"Validation/Duplicate error for {doctype} {doc_data['name']}: {e}"
+            )
+            return None
+        except Exception:
+            logging.error(
+                f"Unexpected error saving {doctype} {doc_data['name']}:\n{traceback.format_exc()}"
+            )
+            return None
+
+    def process_csv_data(
+        self,
+        file_path: str,
+        doctype: str,
+        pincode_df: pd.DataFrame,
+    ):
+        if not os.path.exists(file_path):
+            logging.error(f"CSV file not found: {file_path}")
+            return f"Skipped: {os.path.basename(file_path)} not found."
+
+        results = {
+            "total": 0,
+            "existing": 0,
+            "processed": [],
+            "errors": [],
+            "addresses": [],
+            "addr_errors": [],
+        }
+
+        try:
+            csv_doc_names = [
+                row.get("customer_name", "").replace('"', "").strip()
+                for row in self._read_csv_rows(file_path)
+            ]
+        except Exception as e:
+            logging.error(f"Failed to read CSV file {file_path}: {e}")
+            return f"Error reading {os.path.basename(file_path)}."
+
+        name_field = "supplier_name" if doctype == SUPPLIER_DOCTYPE else "customer_name"
+        existing_docs = set(
+            frappe.get_all(
+                doctype, filters={name_field: ("in", csv_doc_names)}, pluck="name"
+            )
+        )
+        results["existing"] = len(existing_docs)
+
+        for row in self._read_csv_rows(filename=file_path):
+            try:
+                results["total"] += 1
+                doc_data = self._prepare_doc_data(row, doctype)
+                doc_name = doc_data["name"]
+
+                if not doc_name:
+                    logging.warning(f"Skipping row with empty name: {row}")
+                    continue
+
+                if doc_name in existing_docs:
+                    if not self.has_address(doctype=doctype, name=doc_name):
+                        address = self._create_address(
+                            doctype, doc_name, doc_data, pincode_df
+                        )
+                        if address:
+                            results["addresses"].append(address.name)
+                        else:
+                            results["addr_errors"].append(doc_name)
+                else:
+                    saved_doc = self._create_party(doctype, doc_data)
+                    if saved_doc and getattr(saved_doc, "name", None):
+                        results["processed"].append(saved_doc.name)
+                        address = self._create_address(
+                            doctype, saved_doc.name, doc_data, pincode_df
+                        )
+                        if address:
+                            results["addresses"].append(address.name)
+                        else:
+                            results["addr_errors"].append(doc_name + " (Address)")
+                    else:
+                        results["errors"].append(json.dumps(doc_data))
+            except Exception as e:
+                logging.error(
+                    f"Failed to process row: {row}. Error: {e}\n{traceback.format_exc()}"
+                )
+                results["errors"].append(json.dumps({"row": row, "error": str(e)}))
+
+        # Write results to files
+        self._write_results(doctype, results)
+
+        return (
+            f"Total: {results['total']}, "
+            f"Existing: {results['existing']}, "
+            f"Processed: {len(results['processed'])}, "
+            f"Errors: {len(results['errors'])}"
+        )
+
+    def _write_results(self, doctype: str, results: Dict[str, Any]):
+        """Writes the processing results to their respective files, handling concurrent writes."""
+        # Use a lock for shared files and append mode
+        with self.write_lock:
+            if results["processed"]:
+                pd.Series(results["processed"]).to_csv(
+                    self.paths["processed"], mode="a", index=False, header=False
+                )
+            if results["addresses"]:
+                pd.Series(results["addresses"]).to_csv(
+                    self.paths["addr_res"], mode="a", index=False, header=False
+                )
+            if results["addr_errors"]:
+                pd.Series(results["addr_errors"]).to_csv(
+                    self.paths["addr_err"], mode="a", index=False, header=False
                 )
 
-                if doctype == "Supplier":
-                    doc_to_insert.set("supplier_name", doc_data["name"])
-                    doc_to_insert.set("supplier_type", doc_data["type"])
-                    doc_to_insert.set("supplier_group", doc_data["group"])
-                    doc_to_insert.set("default_price_list", "Standard Buying")
-                elif doctype == "Customer":
-                    doc_to_insert.set("customer_name", doc_data["name"])
-                    doc_to_insert.set("customer_type", doc_data["type"])
-                    doc_to_insert.set("customer_group", doc_data["group"])
-                    doc_to_insert.set("default_price_list", "Standard Selling")
+        # Doctype-specific files are not shared, no lock needed, use write mode.
+        path_map = {
+            SUPPLIER_DOCTYPE: ("supp_res", "supp_err"),
+            CUSTOMER_DOCTYPE: ("cust_res", "cust_err"),
+        }
+        res_path, err_path = path_map.get(doctype, (None, None))
+        if res_path and results["processed"]:
+            pd.Series(results["processed"]).to_csv(self.paths[res_path], index=False)
+        if err_path and results["errors"]:
+            pd.Series(results["errors"]).to_csv(self.paths[err_path], index=False)
 
-                try:
-                    found_pincode = self.find_district_by_pincode(
-                        indexed_df=indexed_df, pincode=doc_data["pinCode"]
-                    )
-                    if len(found_pincode) == 0:
-                        raise Exception("No Pincode Found. Pincode is mandatory")
-                    saved_doc = doc_to_insert.save()
-                    address_doc = frappe.get_doc(
-                        {
-                            "doctype": "Address",
-                            "gstin": doc_data["gstin"],
-                            "pan": doc_data["pan"],
-                            "gst_category": "Unregistered"
-                            if (doc_data["gstin"] is None or doc_data["gstin"] == "")
-                            else "Registered Regular",
-                            "links": [
-                                {
-                                    "doctype": "Dynamic Link",
-                                    "link_doctype": doctype,
-                                    "link_name": saved_doc.name,
-                                }
-                            ],
-                            "address_type": (
-                                "Billing" if doctype == "Customer" else "Shipping"
-                            ),
-                            "address_line1": doc_data["addressLine1"],
-                            "state": doc_data["state"],
-                            "city": found_pincode[0],
-                            "pincode": doc_data["pinCode"],
-                            "country": "India",
-                            "is_primary_address": 1,
-                        }
-                    )
-                    try:
-                        saved_address = address_doc.save()
-                        address_docs.append(saved_address.name)
-                    except Exception:
-                        addr_err_docs.append(doc_data["name"] + " Address")
-                        exception_detail = traceback.format_exc()
-                        logging.error(
-                            "An unexpected error occurred during data processing(2):\n%s",
-                            exception_detail,
-                        )
 
-                except Exception:
-                    error_docs.append(json.dumps(doc_data))
-                    exception_detail = traceback.format_exc()
-                    logging.error(
-                        "An unexpected error occurred during data processing(3):\n%s",
-                        exception_detail,
-                    )
-
-        if len(processed_docs) > 0:
-            pd.Series(processed_docs).to_csv(self.prd_path, index=False)
-        if len(address_docs) > 0:
-            pd.Series(address_docs).to_csv(self.addr_res_path, index=False)
-        if len(addr_err_docs) > 0:
-            pd.Series(addr_err_docs).to_csv(self.addr_err_path, index=False)
-        if doctype == "Supplier":
-            if len(processed_docs) > 0:
-                pd.Series(processed_docs).to_csv(self.s_res_path, index=False)
-            if len(error_docs) > 0:
-                pd.Series(error_docs).to_csv(self.serr_res_path, index=False)
-        elif doctype == "Customer":
-            if len(processed_docs) > 0:
-                pd.Series(processed_docs).to_csv(self.c_res_path, index=False)
-            if len(error_docs) > 0:
-                pd.Series(error_docs).to_csv(self.cerr_res_path, index=False)
-
-        return f"Available {doctype}: {len(total_docs)} Existing {doctype}: {len(old_docs)} Processed {doctype}: {len(processed_docs)} Errors {doctype}: {len(error_docs)}"
+def process_doctype_task(processor, file_path, doctype, pincode_df):
+    """
+    Task for processing a single doctype's CSV file.
+    Manages its own database transaction.
+    """
+    try:
+        result = processor.process_csv_data(
+            file_path=file_path,
+            doctype=doctype,
+            pincode_df=pincode_df,
+        )
+        frappe.db.commit()
+        logging.info(f"Successfully processed and committed {doctype}.")
+        return result
+    except Exception:
+        logging.error(
+            f"Error processing {doctype}. Rolling back changes.\n{traceback.format_exc()}"
+        )
+        frappe.db.rollback()
+        # Re-raise to be caught by the future.result() call
+        raise
 
 
 def execute():
-    DATA_CSV_BASE_PATH = os.path.join(
-        os.path.dirname(__file__), "data"
-    )  # This can be made dynamic if needed
+    """Main execution function."""
+    base_path = os.path.join(os.path.dirname(__file__), "data")
+    processor = CSVProcessor(data_csv_base_path=base_path)
+    paths = {
+        "customers": os.path.join(base_path, "customers_1.csv"),
+        "suppliers": os.path.join(base_path, "suppliers_1.csv"),
+        "pincodes": os.path.join(base_path, "pincodes.csv"),
+    }
 
-    customers_csv_path = os.path.join(
-        os.path.dirname(__file__), DATA_CSV_BASE_PATH, "customers_1.csv"
-    )
-    suppliers_csv_path = os.path.join(
-        os.path.dirname(__file__), DATA_CSV_BASE_PATH, "suppliers_1.csv"
-    )
-    pincodes_csv_path = os.path.join(
-        os.path.dirname(__file__), DATA_CSV_BASE_PATH, "pincodes.csv"
-    )
+    try:
+        pincode_df = pd.read_csv(paths["pincodes"])
+    except FileNotFoundError:
+        print(f"CRITICAL: Pincode file not found at {paths['pincodes']}. Aborting.")
+        logging.critical(f"Pincode file not found at {paths['pincodes']}. Aborting.")
+        return
+    except Exception as e:
+        print(f"CRITICAL: Error reading pincode file: {e}. Aborting.")
+        logging.critical(f"Error reading pincode file: {e}. Aborting.")
+        return
 
-    processor = CSVProcessor(
-        data_csv_base_path=DATA_CSV_BASE_PATH,
-    )
-    indexed_df = pd.read_csv(pincodes_csv_path).set_index("Pincode")
+    tasks_to_run = [
+        {"doctype": SUPPLIER_DOCTYPE, "file_path": paths["suppliers"]},
+        {"doctype": CUSTOMER_DOCTYPE, "file_path": paths["customers"]},
+    ]
 
-    supplier_result = processor.process_csv_data(
-        file_path=suppliers_csv_path,
-        doctype="Supplier",
-        indexed_df=indexed_df,
-    )
-    customer_result = processor.process_csv_data(
-        file_path=customers_csv_path,
-        doctype="Customer",
-        indexed_df=indexed_df,
-    )
-    frappe.db.commit()
+    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+        future_to_doctype = {
+            executor.submit(
+                process_doctype_task,
+                processor,
+                task["file_path"],
+                task["doctype"],
+                pincode_df,
+            ): task["doctype"]
+            for task in tasks_to_run
+        }
 
-    print(f"SUPPLIERS: {supplier_result} CUSTOMERS: {customer_result}")
+        for future in concurrent.futures.as_completed(future_to_doctype):
+            doctype_name = future_to_doctype[future]
+            try:
+                result = future.result()
+                print(f"{doctype_name.upper()}S: {result}")
+            except Exception as exc:
+                print(f"An error occurred while processing {doctype_name}: {exc}")
+                # Error is already logged by the task wrapper
+
+    print("\nProcessing finished.")
