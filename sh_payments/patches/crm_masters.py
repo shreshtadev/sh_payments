@@ -133,6 +133,100 @@ class CSVProcessor:
     def has_address(self, doctype: str, name: str) -> bool:
         """Checks if a document has any linked addresses."""
         return bool(self.get_linked_addresses(doctype, name))
+    
+    def find_existing_party(self, doctype: str, doc_data: Dict[str, Any]) -> Document | None:
+        """Find existing party using multiple criteria with frappe.get_doc for detailed checking."""
+        name = doc_data["name"]
+        gstin = doc_data["gstin"]
+        pan = doc_data["pan"]
+        
+        # Check by exact name first
+        name_field = "supplier_name" if doctype == SUPPLIER_DOCTYPE else "customer_name"
+        try:
+            existing_by_name = frappe.get_all(
+                doctype,
+                filters={name_field: name},
+                fields=["name", name_field, "gstin", "pan"],
+                limit=1
+            )
+            if existing_by_name:
+                existing_doc = frappe.get_doc(doctype, existing_by_name[0].name)
+                logging.info(f"Found existing {doctype} by name: {name}")
+                return existing_doc
+        except Exception as e:
+            logging.debug(f"Error checking by name for {name}: {e}")
+        
+        # Check by GSTIN if available
+        if gstin:
+            try:
+                existing_by_gstin = frappe.get_all(
+                    doctype,
+                    filters={"gstin": gstin},
+                    fields=["name", name_field, "gstin", "pan"],
+                    limit=1
+                )
+                if existing_by_gstin:
+                    existing_doc = frappe.get_doc(doctype, existing_by_gstin[0].name)
+                    logging.info(f"Found existing {doctype} by GSTIN: {gstin} (Name: {getattr(existing_doc, name_field)})")
+                    return existing_doc
+            except Exception as e:
+                logging.debug(f"Error checking by GSTIN for {gstin}: {e}")
+        
+        # Check by PAN if available and no GSTIN match
+        if pan:
+            try:
+                existing_by_pan = frappe.get_all(
+                    doctype,
+                    filters={"pan": pan},
+                    fields=["name", name_field, "gstin", "pan"],
+                    limit=1
+                )
+                if existing_by_pan:
+                    existing_doc = frappe.get_doc(doctype, existing_by_pan[0].name)
+                    logging.info(f"Found existing {doctype} by PAN: {pan} (Name: {getattr(existing_doc, name_field)})")
+                    return existing_doc
+            except Exception as e:
+                logging.debug(f"Error checking by PAN for {pan}: {e}")
+        
+        return None
+    
+    def update_existing_party(self, existing_doc: Document, doc_data: Dict[str, Any]) -> Document | None:
+        """Update existing party with new data if needed."""
+        doctype = existing_doc.doctype
+        name_field = "supplier_name" if doctype == SUPPLIER_DOCTYPE else "customer_name"
+        updated = False
+        
+        try:
+            # Update GSTIN if not present but available in new data
+            if not existing_doc.gstin and doc_data["gstin"]:
+                existing_doc.gstin = doc_data["gstin"]
+                existing_doc.gst_category = "Registered Regular"
+                updated = True
+                logging.info(f"Updated GSTIN for {getattr(existing_doc, name_field)}: {doc_data['gstin']}")
+            
+            # Update PAN if not present but available in new data
+            if not existing_doc.pan and doc_data["pan"]:
+                existing_doc.pan = doc_data["pan"]
+                updated = True
+                logging.info(f"Updated PAN for {getattr(existing_doc, name_field)}: {doc_data['pan']}")
+            
+            # Update name if different (be careful with this)
+            current_name = getattr(existing_doc, name_field)
+            if current_name != doc_data["name"] and doc_data["name"]:
+                # Only update if the new name seems more complete/better
+                if len(doc_data["name"]) > len(current_name) or not current_name.strip():
+                    setattr(existing_doc, name_field, doc_data["name"])
+                    updated = True
+                    logging.info(f"Updated name from '{current_name}' to '{doc_data['name']}'")
+            
+            if updated:
+                return existing_doc.save(ignore_permissions=True)
+            else:
+                return existing_doc
+                
+        except Exception as e:
+            logging.error(f"Error updating existing {doctype} {getattr(existing_doc, name_field)}: {e}")
+            return existing_doc  # Return original doc if update fails
 
     @staticmethod
     def find_district_by_pincode(pincode_df: pd.DataFrame, pincode: str) -> List[str]:
@@ -313,31 +407,11 @@ class CSVProcessor:
             "total": 0,
             "existing": 0,
             "processed": [],
+            "updated": [],
             "errors": [],
             "addresses": [],
             "addr_errors": [],
         }
-
-        try:
-            # Get the correct field name for each doctype
-            name_field_in_csv = (
-                "supplier_name" if doctype == SUPPLIER_DOCTYPE else "customer_name"
-            )
-            csv_doc_names = [
-                row.get(name_field_in_csv, "").replace('"', "").strip()
-                for row in self._read_csv_rows(file_path)
-            ]
-        except Exception as e:
-            logging.error(f"Failed to read CSV file {file_path}: {e}")
-            return f"Error reading {os.path.basename(file_path)}."
-
-        name_field = "supplier_name" if doctype == SUPPLIER_DOCTYPE else "customer_name"
-        existing_docs = set(
-            frappe.get_all(
-                doctype, filters={name_field: ("in", csv_doc_names)}, pluck="name"
-            )
-        )
-        results["existing"] = len(existing_docs)
 
         for row in self._read_csv_rows(filename=file_path):
             try:
@@ -349,29 +423,49 @@ class CSVProcessor:
                     logging.warning(f"Skipping row with empty name: {row}")
                     continue
 
-                if doc_name in existing_docs:
-                    if not self.has_address(doctype=doctype, name=doc_name):
+                # Check for existing party using enhanced duplicate detection
+                existing_party = self.find_existing_party(doctype, doc_data)
+                
+                if existing_party:
+                    results["existing"] += 1
+                    
+                    # Update existing party if needed
+                    updated_party = self.update_existing_party(existing_party, doc_data)
+                    if updated_party and updated_party != existing_party:
+                        results["updated"].append(updated_party.name)
+                    
+                    # Check and create address if missing
+                    name_field = "supplier_name" if doctype == SUPPLIER_DOCTYPE else "customer_name"
+                    party_name = getattr(existing_party, name_field)
+                    
+                    if not self.has_address(doctype=doctype, name=existing_party.name):
                         address = self._create_address(
-                            doctype, doc_name, doc_data, pincode_df
+                            doctype, existing_party.name, doc_data, pincode_df
                         )
                         if address:
                             results["addresses"].append(address.name)
+                            logging.info(f"Created address for existing {doctype}: {party_name}")
                         else:
-                            results["addr_errors"].append(doc_name)
+                            results["addr_errors"].append(f"{party_name} (Address Creation Failed)")
+                    else:
+                        logging.debug(f"Address already exists for {doctype}: {party_name}")
                 else:
+                    # Create new party
                     saved_doc = self._create_party(doctype, doc_data)
                     if saved_doc and getattr(saved_doc, "name", None):
                         results["processed"].append(saved_doc.name)
-                        if saved_doc.name is not None:
-                            address = self._create_address(
-                                doctype, saved_doc.name, doc_data, pincode_df
-                            )
-                            if address:
-                                results["addresses"].append(address.name)
-                            else:
-                                results["addr_errors"].append(doc_name + " (Address)")
+                        
+                        # Create address for new party
+                        address = self._create_address(
+                            doctype, saved_doc.name, doc_data, pincode_df
+                        )
+                        if address:
+                            results["addresses"].append(address.name)
+                            name_field = "supplier_name" if doctype == SUPPLIER_DOCTYPE else "customer_name"
+                            party_name = getattr(saved_doc, name_field)
+                            logging.info(f"Created new {doctype} with address: {party_name}")
                         else:
-                            results["addr_errors"].append(doc_name + " (No Name)")
+                            results["addr_errors"].append(f"{doc_name} (Address Creation Failed)")
                     else:
                         results["errors"].append(json.dumps(doc_data))
             except Exception as e:
@@ -387,6 +481,7 @@ class CSVProcessor:
             f"Total: {results['total']}, "
             f"Existing: {results['existing']}, "
             f"Processed: {len(results['processed'])}, "
+            f"Updated: {len(results['updated'])}, "
             f"Errors: {len(results['errors'])}"
         )
 
@@ -396,6 +491,12 @@ class CSVProcessor:
         if results["processed"]:
             pd.Series(results["processed"]).to_csv(
                 self.paths["processed"], mode="a", index=False, header=False
+            )
+        if results["updated"]:
+            # Create an updated results file path
+            updated_path = self.paths["processed"].replace(".txt", "_updated.txt")
+            pd.Series(results["updated"]).to_csv(
+                updated_path, mode="a", index=False, header=False
             )
         if results["addresses"]:
             pd.Series(results["addresses"]).to_csv(
