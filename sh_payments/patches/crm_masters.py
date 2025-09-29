@@ -9,6 +9,8 @@ from typing import Any, Dict, Generator, List
 
 import frappe
 import pandas as pd
+from frappe import Document
+from frappe.exceptions import NotFound
 
 # Constants for DocTypes and other magic strings
 CUSTOMER_DOCTYPE = "Customer"
@@ -91,7 +93,7 @@ class CSVProcessor:
                 fields=["name"],
                 pluck="name",
             )
-        except frappe.exceptions.FrappeException as e:
+        except NotFound as e:
             logging.error(f"Error fetching linked addresses for {link_name}: {e}")
             return []
 
@@ -138,7 +140,7 @@ class CSVProcessor:
         link_name: str,
         doc_data: Dict[str, Any],
         pincode_df: pd.DataFrame,
-    ) -> frappe.Document | None:
+    ) -> Document | None:
         """Creates and saves an Address document."""
         pincode = doc_data.get("pinCode")
         districts = self.find_district_by_pincode(pincode_df, pincode)
