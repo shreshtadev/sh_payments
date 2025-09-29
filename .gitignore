@@ -5,3 +5,4 @@
 tags
 node_modules
 __pycache__
+sh_payments/patches/data/result/**
