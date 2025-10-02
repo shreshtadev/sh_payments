@@ -1,7 +1,9 @@
-import frappe
+import json
 import os
 import re
-import json
+
+import frappe
+import pandas as pd
 
 
 def is_similar(hsn_full: str, hsn_base: str) -> bool:
@@ -80,13 +82,13 @@ def load_products_data(json_file):
     """Load products.json data from the data directory."""
     data_path = os.path.join(os.path.dirname(__file__), "data", json_file)
     if not os.path.exists(data_path):
-        frappe.log(f"products.json not found at: {data_path}")
+        frappe.msgprint(f"products.json not found at: {data_path}")
         return []
     try:
         with open(data_path, "r", encoding="utf-8") as fh:
             return json.load(fh)
     except Exception as e:
-        frappe.log(f"Failed to load products.json: {e}")
+        frappe.msgprint(f"Failed to load products.json: {e}")
         return []
 
 
@@ -213,30 +215,32 @@ def update_item_taxes_from_json(data):
                     for cabbr in company_abbrs
                 ]
             except (IndexError, ValueError):
-                frappe.log(
+                frappe.msgprint(
                     f"Could not parse tax rate from: {tax_rate_string}",
                 )
                 continue
 
             # 3. Find the corresponding Item Tax Template. Use a cache to optimize.
             for tax_template_name in tax_template_names:
-                frappe.log(
+                frappe.msgprint(
                     f"Processing item {idx}: '{item_name_from_json}' with tax template '{tax_template_name}'",
                 )
                 if tax_template_name not in tax_template_map:
                     if not frappe.db.exists("Item Tax Template", tax_template_name):
-                        frappe.log(
+                        frappe.msgprint(
                             f"Item Tax Template '{tax_template_name}' not found.",
                         )
                         tax_template_map[tax_template_name] = None
                         continue
                     tax_template_map[tax_template_name] = tax_template_name
-                frappe.log(f"Found tax template: {tax_template_map[tax_template_name]}")
+                frappe.msgprint(
+                    f"Found tax template: {tax_template_map[tax_template_name]}"
+                )
                 hsn_val = find_hsn_match(hsn_from_json)
-                frappe.log(f"HSN: {hsn_val}")
+                frappe.msgprint(f"HSN: {hsn_val}")
                 if tax_template_map.get(tax_template_name) and hsn_val is not None:
                     # 5. Update the Item record.
-                    frappe.log(f"Fetching item: {item_name_from_json}")
+                    frappe.msgprint(f"Fetching item: {item_name_from_json}")
                     try:
                         item_doc = create_item(
                             item_name_from_json,
@@ -253,7 +257,7 @@ def update_item_taxes_from_json(data):
                             and item_doc is not None
                             and tax_category_name is not None
                         ):
-                            frappe.log("Updating item taxes")
+                            frappe.msgprint("Updating item taxes")
                             item_doc.append(
                                 "taxes",
                                 {
@@ -264,25 +268,84 @@ def update_item_taxes_from_json(data):
                                 },
                             )
                         item_doc.save()
-                        frappe.log("Updated taxes")
+                        frappe.msgprint("Updated taxes")
                         frappe.db.commit()
                     except Exception as ex:
-                        frappe.log(f"Unable to update taxes: {ex}")
+                        frappe.msgprint(f"Unable to update taxes: {ex}")
                         frappe.db.rollback()
-    frappe.log("Item taxes update process completed.")
+    frappe.msgprint("Item taxes update process completed.")
 
 
 def execute():
-    """Import products from products.json as Item records."""
-    filenames = ["products.json", "products_2.json"]
-    for file_name in filenames:
-        rows = load_products_data(file_name)
-        if not rows:
-            return
-        total = len(rows)
+    # """Import products from products.json as Item records."""
+    # filenames = ["products.json", "products_2.json"]
+    # for file_name in filenames:
+    #     rows = load_products_data(file_name)
+    #     if not rows:
+    #         return
+    #     total = len(rows)
 
-        frappe.log(f"Starting products import: {total} rows in file {file_name}")
-        update_item_taxes_from_json(rows)
-        frappe.log(
-            f"Completed item tax template updates from JSON data from {file_name}"
+    #     frappe.msgprint(f"Starting products import: {total} rows in file {file_name}")
+    #     update_item_taxes_from_json(rows)
+    #     frappe.msgprint(
+    #         f"Completed item tax template updates from JSON data from {file_name}"
+    #     )
+    """Update Taxes By Item HSN Code"""
+    filename = "pricelistupdates.csv"
+    column_names = ["hsn_code", "updated_gst"]
+    taxupdates_df = pd.read_csv(
+        os.path.join(os.path.dirname(__file__), "data", filename),
+        usecols=column_names,
+        header=0,
+    )
+    frappe.msgprint("Reading Updated PriceList")
+    tax_category = frappe.get_doc("Tax Category", "In-State")
+    company_abbrs = [
+        cmp["abbr"]
+        for cmp in frappe.get_all(
+            "Company",
+            fields=["abbr"],
         )
+    ]
+    items = frappe.get_list("Item", fields=["name", "gst_hsn_code"])
+    taxupdates_df["updated_gst_perc"] = (
+        (taxupdates_df["updated_gst"] * 100).astype(int).astype(str)
+    )
+    tax_map = taxupdates_df.set_index("hsn_code")["updated_gst_perc"].to_dict()
+    for item_data in items:
+        item_name = item_data.name
+        item_hsn = int(item_data.gst_hsn_code)
+        if not item_hsn:
+            continue
+        if item_hsn in tax_map:
+            gst_rate_str = tax_map[item_hsn]
+            try:
+                item_doc = frappe.get_doc("Item", item_name)
+                tax_template_names = [
+                    f"GST {gst_rate_str}% - {cabbr}"
+                    if int(gst_rate_str) > 0
+                    else f"Exempted - {cabbr}"
+                    for cabbr in company_abbrs
+                ]
+                item_doc.set("taxes", [])
+                for tax_template_name in tax_template_names:
+                    item_tx = {
+                        "item_tax_template": tax_template_name,
+                        "tax_category": tax_category.name,
+                        "minimum_net_rate": 0,
+                        "maximum_net_rate": 0,
+                    }
+                    item_doc.append(
+                        "taxes",
+                        item_tx,
+                    )
+                item_doc.save()
+                frappe.db.commit()
+
+            except Exception as e:
+                frappe.msgprint(
+                    f"Error updating Item {item_name} (HSN {item_hsn}): {e}",
+                    "Item Tax Update Error",
+                    indicator="red",
+                )
+                frappe.db.rollback()  # Rollback on error
