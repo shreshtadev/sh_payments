@@ -97,6 +97,8 @@ def execute():
             hsn_code_csv = sgpb["hsn_code"].strip()
             hsn_code = ""
             try:
+                if not hsn_code_csv:
+                    continue
                 hsn_code = frappe.get_list(
                     "GST HSN Code", filters=[["hsn_code", "LIKE", f"%{hsn_code_csv}%"]]
                 )[0]
