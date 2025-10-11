@@ -133,13 +133,15 @@ class CSVProcessor:
     def has_address(self, doctype: str, name: str) -> bool:
         """Checks if a document has any linked addresses."""
         return bool(self.get_linked_addresses(doctype, name))
-    
-    def find_existing_party(self, doctype: str, doc_data: Dict[str, Any]) -> Document | None:
+
+    def find_existing_party(
+        self, doctype: str, doc_data: Dict[str, Any]
+    ) -> Document | None:
         """Find existing party using multiple criteria with frappe.get_doc for detailed checking."""
         name = doc_data["name"]
         gstin = doc_data["gstin"]
         pan = doc_data["pan"]
-        
+
         # Check by exact name first
         name_field = "supplier_name" if doctype == SUPPLIER_DOCTYPE else "customer_name"
         try:
@@ -147,7 +149,7 @@ class CSVProcessor:
                 doctype,
                 filters={name_field: name},
                 fields=["name", name_field, "gstin", "pan"],
-                limit=1
+                limit=1,
             )
             if existing_by_name:
                 existing_doc = frappe.get_doc(doctype, existing_by_name[0].name)
@@ -155,7 +157,7 @@ class CSVProcessor:
                 return existing_doc
         except Exception as e:
             logging.debug(f"Error checking by name for {name}: {e}")
-        
+
         # Check by GSTIN if available
         if gstin:
             try:
@@ -163,15 +165,17 @@ class CSVProcessor:
                     doctype,
                     filters={"gstin": gstin},
                     fields=["name", name_field, "gstin", "pan"],
-                    limit=1
+                    limit=1,
                 )
                 if existing_by_gstin:
                     existing_doc = frappe.get_doc(doctype, existing_by_gstin[0].name)
-                    logging.info(f"Found existing {doctype} by GSTIN: {gstin} (Name: {getattr(existing_doc, name_field)})")
+                    logging.info(
+                        f"Found existing {doctype} by GSTIN: {gstin} (Name: {getattr(existing_doc, name_field)})"
+                    )
                     return existing_doc
             except Exception as e:
                 logging.debug(f"Error checking by GSTIN for {gstin}: {e}")
-        
+
         # Check by PAN if available and no GSTIN match
         if pan:
             try:
@@ -179,53 +183,68 @@ class CSVProcessor:
                     doctype,
                     filters={"pan": pan},
                     fields=["name", name_field, "gstin", "pan"],
-                    limit=1
+                    limit=1,
                 )
                 if existing_by_pan:
                     existing_doc = frappe.get_doc(doctype, existing_by_pan[0].name)
-                    logging.info(f"Found existing {doctype} by PAN: {pan} (Name: {getattr(existing_doc, name_field)})")
+                    logging.info(
+                        f"Found existing {doctype} by PAN: {pan} (Name: {getattr(existing_doc, name_field)})"
+                    )
                     return existing_doc
             except Exception as e:
                 logging.debug(f"Error checking by PAN for {pan}: {e}")
-        
+
         return None
-    
-    def update_existing_party(self, existing_doc: Document, doc_data: Dict[str, Any]) -> Document | None:
+
+    def update_existing_party(
+        self, existing_doc: Document, doc_data: Dict[str, Any]
+    ) -> Document | None:
         """Update existing party with new data if needed."""
         doctype = existing_doc.doctype
         name_field = "supplier_name" if doctype == SUPPLIER_DOCTYPE else "customer_name"
         updated = False
-        
+
         try:
             # Update GSTIN if not present but available in new data
-            if not existing_doc.gstin and doc_data["gstin"]:
-                existing_doc.gstin = doc_data["gstin"]
-                existing_doc.gst_category = "Registered Regular"
+            if not existing_doc.get("gstin") and doc_data["gstin"]:
+                existing_doc.set("gstin", doc_data["gstin"])
+                existing_doc.set("gst_category", "Registered Regular")
                 updated = True
-                logging.info(f"Updated GSTIN for {getattr(existing_doc, name_field)}: {doc_data['gstin']}")
-            
+                logging.info(
+                    f"Updated GSTIN for {getattr(existing_doc, name_field)}: {doc_data['gstin']}"
+                )
+
             # Update PAN if not present but available in new data
-            if not existing_doc.pan and doc_data["pan"]:
-                existing_doc.pan = doc_data["pan"]
+            if not existing_doc.get("pan") and doc_data["pan"]:
+                existing_doc.set("pan", doc_data["pan"])
                 updated = True
-                logging.info(f"Updated PAN for {getattr(existing_doc, name_field)}: {doc_data['pan']}")
-            
+                logging.info(
+                    f"Updated PAN for {getattr(existing_doc, name_field)}: {doc_data['pan']}"
+                )
+
             # Update name if different (be careful with this)
             current_name = getattr(existing_doc, name_field)
             if current_name != doc_data["name"] and doc_data["name"]:
                 # Only update if the new name seems more complete/better
-                if len(doc_data["name"]) > len(current_name) or not current_name.strip():
+                if (
+                    len(doc_data["name"]) > len(current_name)
+                    or not current_name.strip()
+                ):
                     setattr(existing_doc, name_field, doc_data["name"])
                     updated = True
-                    logging.info(f"Updated name from '{current_name}' to '{doc_data['name']}'")
-            
+                    logging.info(
+                        f"Updated name from '{current_name}' to '{doc_data['name']}'"
+                    )
+
             if updated:
                 return existing_doc.save(ignore_permissions=True)
             else:
                 return existing_doc
-                
+
         except Exception as e:
-            logging.error(f"Error updating existing {doctype} {getattr(existing_doc, name_field)}: {e}")
+            logging.error(
+                f"Error updating existing {doctype} {getattr(existing_doc, name_field)}: {e}"
+            )
             return existing_doc  # Return original doc if update fails
 
     @staticmethod
@@ -425,47 +444,75 @@ class CSVProcessor:
 
                 # Check for existing party using enhanced duplicate detection
                 existing_party = self.find_existing_party(doctype, doc_data)
-                
+
                 if existing_party:
                     results["existing"] += 1
-                    
+
                     # Update existing party if needed
                     updated_party = self.update_existing_party(existing_party, doc_data)
                     if updated_party and updated_party != existing_party:
                         results["updated"].append(updated_party.name)
-                    
+
                     # Check and create address if missing
-                    name_field = "supplier_name" if doctype == SUPPLIER_DOCTYPE else "customer_name"
+                    name_field = (
+                        "supplier_name"
+                        if doctype == SUPPLIER_DOCTYPE
+                        else "customer_name"
+                    )
                     party_name = getattr(existing_party, name_field)
-                    
-                    if not self.has_address(doctype=doctype, name=existing_party.name):
+
+                    if (
+                        existing_party
+                        and existing_party.name
+                        and not self.has_address(
+                            doctype=doctype, name=existing_party.name
+                        )
+                    ):
                         address = self._create_address(
                             doctype, existing_party.name, doc_data, pincode_df
                         )
                         if address:
                             results["addresses"].append(address.name)
-                            logging.info(f"Created address for existing {doctype}: {party_name}")
+                            logging.info(
+                                f"Created address for existing {doctype}: {party_name}"
+                            )
                         else:
-                            results["addr_errors"].append(f"{party_name} (Address Creation Failed)")
+                            results["addr_errors"].append(
+                                f"{party_name} (Address Creation Failed)"
+                            )
                     else:
-                        logging.debug(f"Address already exists for {doctype}: {party_name}")
+                        logging.debug(
+                            f"Address already exists for {doctype}: {party_name}"
+                        )
                 else:
                     # Create new party
                     saved_doc = self._create_party(doctype, doc_data)
-                    if saved_doc and getattr(saved_doc, "name", None):
+                    if (
+                        saved_doc
+                        and saved_doc.name
+                        and getattr(saved_doc, "name", None)
+                    ):
                         results["processed"].append(saved_doc.name)
-                        
+
                         # Create address for new party
                         address = self._create_address(
                             doctype, saved_doc.name, doc_data, pincode_df
                         )
                         if address:
                             results["addresses"].append(address.name)
-                            name_field = "supplier_name" if doctype == SUPPLIER_DOCTYPE else "customer_name"
+                            name_field = (
+                                "supplier_name"
+                                if doctype == SUPPLIER_DOCTYPE
+                                else "customer_name"
+                            )
                             party_name = getattr(saved_doc, name_field)
-                            logging.info(f"Created new {doctype} with address: {party_name}")
+                            logging.info(
+                                f"Created new {doctype} with address: {party_name}"
+                            )
                         else:
-                            results["addr_errors"].append(f"{doc_name} (Address Creation Failed)")
+                            results["addr_errors"].append(
+                                f"{doc_name} (Address Creation Failed)"
+                            )
                     else:
                         results["errors"].append(json.dumps(doc_data))
             except Exception as e:

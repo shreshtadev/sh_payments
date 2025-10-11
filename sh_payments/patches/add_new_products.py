@@ -44,7 +44,7 @@ def find_stock_uom(item_code: str):
     return frappe.get_doc("UOM", "nos")
 
 
-def load_products(file_path):
+def load_products(file_path) -> list[dict[str, str]]:
     """Reads a CSV file, treating each row as a dictionary."""
     file_fields = []
     with open(file_path, mode="r", newline="", encoding="utf-8") as file:
@@ -98,17 +98,17 @@ def create_products(
         logging.error(f"Invalid HSN CODE for {product_name}")
 
 
-def get_company_details():
+def get_company_details(company_name: str = "Shree Agencies"):
     """Get company details and validate."""
     try:
-        company = frappe.get_doc("Company", "Shree Graphics")
+        company = frappe.get_doc("Company", company_name)
         return {
             "company": company,
             "abbr": company.get("abbr"),
             "item_group_name": company.name,
         }
     except frappe.DoesNotExistError:
-        logging.error("Company 'Shree Graphics' not found")
+        logging.error(f"Company '{company}' not found")
         raise
     except Exception as e:
         logging.error(f"Error getting company details: {e}")
@@ -117,10 +117,13 @@ def get_company_details():
 
 def process_gst_rate(gst):
     """Process GST rate and return formatted strings."""
-    gst = gst.replace(" ", "")
-    gst_rate = f"GST {gst}"
-    actual_gst_rate = gst.split("%")[0]
-    return gst_rate if int(actual_gst_rate) != 0 else "Exempted"
+    try:
+        gst = gst.replace(" ", "")
+        gst_rate = f"GST {gst}"
+        actual_gst_rate = gst.split("%")[0]
+        return gst_rate if actual_gst_rate and int(actual_gst_rate) != 0 else "Exempted"
+    except ValueError:
+        return None
 
 
 def get_hsn_code(hsn_code_csv):
@@ -134,23 +137,42 @@ def get_hsn_code(hsn_code_csv):
     return hsn_code_list[0]
 
 
-def process_single_product(product, company_abbr, item_group_name):
+def process_single_product(product: dict[str, str]):
     """Process a single product entry."""
     product_name = product.get("product_name", "").strip()
     hsn_code_csv = product.get("hsn_code", "").strip()
+    company_csv = product.get("company", "").strip()
+    product_gst = product.get("gst", "").strip()
 
-    if not product_name or not hsn_code_csv:
+    if (
+        not product_name
+        or not hsn_code_csv
+        or len(hsn_code_csv) < 4
+        or len(hsn_code_csv) > 8
+        or not company_csv
+        or not product_gst
+    ):
         logging.warning(
-            f"Skipping row due to missing product_name or hsn_code: {product}"
+            f"Skipping row due to missing product_name, hsn_code, company, gst: {product}"
         )
         return False
 
-    gst_rate_with_exempted = process_gst_rate(product.get("gst", ""))
+    gst_rate_with_exempted = process_gst_rate(product_gst)
     hsn_code = get_hsn_code(hsn_code_csv)
 
     if not hsn_code:
         logging.warning(f"Skipping {product_name} - HSN code {hsn_code_csv} not found")
         return False
+
+    company = get_company_details(company_csv)
+    if not company:
+        logging.warning(
+            f"Skipping {product_name} - Company Name {company_csv} not found"
+        )
+        return False
+
+    company_abbr = company["abbr"]
+    item_group_name = company["item_group_name"]
 
     tax_template_name = f"{gst_rate_with_exempted} - {company_abbr}"
     stock_uom_name = str(find_stock_uom(product_name).name)
@@ -173,28 +195,30 @@ def process_single_product(product, company_abbr, item_group_name):
 
 def execute():
     """Add Items from CSV to ERPNext."""
-    file_path = os.path.join(os.path.dirname(__file__), "data", "sgproducts_1.csv")
-
-    try:
-        company_details = get_company_details()
-        products = load_products(file_path=file_path)
-
-        success_count = 0
-        for product in products:
-            if process_single_product(
-                product, company_details["abbr"], company_details["item_group_name"]
-            ):
-                success_count += 1
+    file_names = ["sgproducts_1.csv", "saproducts_1.csv"]
+    for fln in file_names:
+        logging.info(f"FileName: {fln}")
+        file_path = os.path.join(os.path.dirname(__file__), "data", fln)
 
         try:
-            frappe.db.commit()
-            logging.info(
-                f"Successfully processed {success_count} out of {len(products)} products"
-            )
-        except Exception as e:
-            logging.error(f"Database commit failed: {e}\n{traceback.format_exc()}")
-            frappe.db.rollback()
+            products = load_products(file_path=file_path)
 
-    except Exception as e:
-        logging.error(f"Unable to import items: {e}\n{traceback.format_exc()}")
-        frappe.db.rollback()
+            success_count = 0
+            for product in products:
+                if process_single_product(
+                    product,
+                ):
+                    success_count += 1
+
+            try:
+                frappe.db.commit()
+                logging.info(
+                    f"Successfully processed {success_count} out of {len(products)} products"
+                )
+            except Exception as e:
+                logging.error(f"Database commit failed: {e}\n{traceback.format_exc()}")
+                frappe.db.rollback()
+
+        except Exception as e:
+            logging.error(f"Unable to import items: {e}\n{traceback.format_exc()}")
+            frappe.db.rollback()
