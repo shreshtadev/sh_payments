@@ -100,7 +100,6 @@
                             {{doc.get('reference_no') or ''}} <strong>ದಿನಾಂಕ.</strong>
                             {{ doc.get('reference_date') and frappe.utils.formatdate(doc.get('reference_date')) or '' }}
                             <span>
-                                <strong>ಬ್ಯಾಂಕ್</strong>
                                 {{ doc.get("party_bank_account") or "-" }}
                             </span>
                         </span>
