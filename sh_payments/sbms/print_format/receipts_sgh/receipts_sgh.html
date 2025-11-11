@@ -1,0 +1,128 @@
+{%- from "templates/print_formats/standard_macros.html" import add_header -%}
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/css/bootstrap.min.css" rel="stylesheet"
+    integrity="sha384-LN+7fdVzj6u52u30Kp6M/trliBMCMKTyK833zpbD+pXdCLuTusPj697FH4R/5mcr" crossorigin="anonymous" />
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/js/bootstrap.bundle.min.js"
+    integrity="sha384-ndDqU0Gzau9qJ1lfW4pNLlhNTkCfHzAVBReH9diLvGRem5+R9g2FzA8ZGN954O5Q"
+    crossorigin="anonymous"></script>
+<style>
+    @media print {
+        .container {
+            width: 21cm;
+            height: 29.7cm;
+            padding: 2cm;
+        }
+
+        .card {
+            page-break-inside: avoid;
+        }
+    }
+
+    .card {
+        border: 3px solid #222 !important;
+        border-radius: 18px !important;
+        background: #ffe066 !important;
+        box-shadow: none !important;
+    }
+
+    .card-header {
+        background: #ffe066 !important;
+        border-bottom: none !important;
+        border-radius: 16px 16px 0 0 !important;
+        padding: 0.5rem 1rem !important;
+        position: relative;
+    }
+
+    .print-heading-label {
+        color: #b30000 !important;
+        font-weight: bold !important;
+        font-size: 1rem !important;
+        letter-spacing: 2px;
+        margin-bottom: 0;
+    }
+
+    .rashid-box {
+        display: inline-block;
+        background: #b30000;
+        color: #fff;
+        font-weight: bold;
+        border-radius: 6px;
+        padding: 0.1em 1.2em;
+        font-size: 1.3rem;
+        /* Remove absolute positioning */
+        position: static;
+        left: auto;
+        top: auto;
+        transform: none;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.07);
+        margin-top: 0.3rem;
+        /* Add some spacing below the heading */
+    }
+</style>
+<div class="print-format">
+    <div class="card border-dark bg-warning">
+        <div class="card-header text-center print-heading position-relative">
+            <div style="font-size: 1.2rem">ॐ</div>
+            <h5 class="print-heading-label">ಸುರಭಿ ಗೋಶಾಲೆ</h5>
+            <p>
+                ಜಿಲ್ಲಾ ಬ್ರಾಹ್ಮಣ ಮಹಾಸಭಾ ಶಿವಮೊಗ್ಗ ಪ್ರಾಯೋಜಿತ (ರಿ)
+                <small>
+                    ಮಂಡೆನಕೊಪ್ಪ. ಎನ್.ಆರ್.ಪುರ ರಸ್ತೆ, ಶಿವಮೊಗ್ಗ.
+                </small>
+            </p>
+        </div>
+        <div class="card-body px-4 py-3">
+            <div class="row mb-2">
+                <div class="col-6">
+                    <strong>ನಂ.</strong>
+                    <span class="ms-2">{{ doc.name }}</span>
+                </div>
+                <div class="col-6 text-end">
+                    <strong>ದಿನಾಂಕ:</strong>
+                    <span class="ms-2">{{ frappe.utils.format_date(doc.creation) }}</span>
+                </div>
+            </div>
+            <div class="border border-dark rounded p-3 mb-3" style="background: #fffbe7">
+                <div class="row mb-2">
+                    <div class="col-12">
+                        <strong>ಶ್ರೀಮತಿ/ಶ್ರೀ</strong>
+                        {{ doc.get("party_name") or doc.get("party") or "" }}
+                        <strong>ಇವರಿಂದ</strong>
+                        {{ doc.get("remarks") or doc.get("remarks_html") or ""
+                        }}
+                        <strong>ಬಾಬ್ತು</strong>
+                        {{ doc.get("base_in_words") }}
+                        <strong>ರೂ.ಗಳನ್ನು</strong>
+                        <strong>{{doc.get('mode_of_payment') or ''}}</strong>
+                        <span>
+                            {{doc.get('reference_no') or ''}}
+                            <strong>ದಿನಾಂಕ.</strong>
+                            {{ doc.get('reference_date') and
+                            frappe.utils.formatdate(doc.get('reference_date'))
+                            or '' }}
+                            <span>
+                                <strong>ಬ್ಯಾಂಕ್</strong>
+                                {{ doc.get("party_bank_account") or "-" }}
+                            </span>
+                        </span>
+                        <strong>ಮೂಲಕ ಕೃತಜ್ಞಾತಪೂರ್ವಕವಾಗಿ ನಿಧಿಗೆ
+                            ಸ್ವೀಕರಿಸಲಗಿದೆ</strong>
+                    </div>
+                </div>
+            </div>
+            <div class="row">
+                <div class="d-flex">
+                    <div class="border border-danger rounded p-2 text-center" style="font-size: 1.5rem">
+                        <strong>ರೂ.</strong>
+                        {{ frappe.format(doc.get("paid_amount") or
+                        doc.get("received_amount") or
+                        doc.get("base_paid_amount") or 0, {'fieldtype':
+                        'Currency'}) }}
+                    </div>
+                    <div class="p-2 flex-grow-1">ಹಣ ಪಡೆದವರ ಸಹಿ</div>
+                    <div class="p-2 flex-grow-1 text-end">ಹಣ ಕೊಟ್ಟವರ ಸಹಿ</div>
+                </div>
+            </div>
+            <hr />
+        </div>
+    </div>
+</div>
