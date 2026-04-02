@@ -108,17 +108,21 @@
                 </div>
             </div>
             <div class="row">
-                <div class="d-flex">
-                    <div class="border border-danger rounded p-2 text-center" style="font-size:1.5rem;">
+                <div class="d-flex align-items-end w-100">
+
+                    <div class="border border-black rounded p-2 text-center" style="font-size:1.5rem;">
                         <strong>ರೂ.</strong>
                         {{ frappe.format(doc.get("paid_amount") or doc.get("received_amount") or
                         doc.get("base_paid_amount") or 0,
                         {'fieldtype': 'Currency'}) }}
                     </div>
-                    <div class="p-2 flex-grow-1">Signature</div>
-                    <div class="p-2 flex-grow-1 text-end">Signature (Office)</div>
+
+                    <div class="px-4">Signature</div>
+
+                    <div class="ms-auto px-4 text-end">Signature (Office)</div>
+
                 </div>
-                </div>
+            </div>
         </div>
     </div>
 </div>
