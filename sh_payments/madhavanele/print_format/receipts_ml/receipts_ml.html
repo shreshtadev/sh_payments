@@ -98,7 +98,7 @@
                         <strong>through</strong>
                         <strong>{{doc.get('mode_of_payment') or ''}}</strong>
                         <span>
-                            {{doc.get('reference_no') or ''}} <strong>ದಿನಾಂಕ.</strong>
+                            {{doc.get('reference_no') or ''}} <strong>dated.</strong>
                             {{ doc.get('reference_date') and frappe.utils.formatdate(doc.get('reference_date')) or '' }}
                             <span>
                                 {{ doc.get("party_bank_account") or "-" }}
@@ -111,7 +111,6 @@
                 <div class="d-flex align-items-end w-100">
 
                     <div class="border border-black rounded p-2 text-center" style="font-size:1.5rem;">
-                        <strong>ರೂ.</strong>
                         {{ frappe.format(doc.get("paid_amount") or doc.get("received_amount") or
                         doc.get("base_paid_amount") or 0,
                         {'fieldtype': 'Currency'}) }}
